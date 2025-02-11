@@ -68,6 +68,8 @@ SQLDNAEncoder()
 SurgicalSimulator()
 ```
 
-To see more examples how to use biobridge see the test files, biobridge works well with jupyter notebooks
+To see more examples how to use biobridge see the test files, biobridge works well with jupyter notebooks.
+
 You can setup a config for biobridge to do this download the create_config.py file.
-If you want to use something else than vscode you can use my <a href="https://github.com/Okerew/biobridge_editor">editor</a> built for this library
+
+If you want to use something else than vscode you can use my <a href="https://github.com/Okerew/biobridge_editor">editor</a> built for this library.

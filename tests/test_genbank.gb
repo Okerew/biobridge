@@ -1,0 +1,34 @@
+
+LOCUS       SCU49845     5028 bp    DNA             PLN       21-JUN-1999
+DEFINITION  Saccharomyces cerevisiae TCP1-beta gene, partial cds, and Axl2p
+            (AXL2) and Rev7p (REV7) genes, complete cds.
+ACCESSION   U49845
+VERSION     U49845.1  GI:1293613
+KEYWORDS    .
+SOURCE      Saccharomyces cerevisiae (baker's yeast)
+  ORGANISM  Saccharomyces cerevisiae
+            Eukaryota; Fungi; Ascomycota; Saccharomycotina; Saccharomycetes;
+            Saccharomycetales; Saccharomycetaceae; Saccharomyces.
+REFERENCE   1  (bases 1 to 5028)
+  AUTHORS   Torpey,L.E., Gibbs,P.E., Nelson,J. and Lawrence,C.W.
+  TITLE     Cloning and sequence of REV7, a gene whose function is required for
+            DNA damage-induced mutagenesis in Saccharomyces cerevisiae
+  JOURNAL   Yeast 10 (11), 1503-1509 (1994)
+  PUBMED    7871890
+FEATURES             Location/Qualifiers
+     source          1..5028
+                     /organism="Saccharomyces cerevisiae"
+                     /db_xref="taxon:4932"
+                     /chromosome="IX"
+                     /map="9"
+     CDS             <1..206
+                     /codon_start=3
+                     /product="TCP1-beta"
+                     /protein_id="AAA98665.1"
+                     /translation="SSIYNGISTSGLDLNNGTIADMRQLGIVESYKLKRAVVSSASEA
+                     AEVLLRVDNIIRARPRTANRQHM"
+ORIGIN
+        1 gatcctccat atacaacggt atctccacct caggtttaga tctcaacaac ggaaccattg
+       61 ccgacatgag acagttaggt atcgtcgaga gttacaagct aaaacgagca gtagtcagct
+      121 ctgcatctga agccgctgaa gttctactaa gggtggataa catcatccgt gcaagaccaa
+//

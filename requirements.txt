@@ -21,3 +21,5 @@ pytesseract~=0.3.13
 pillow~=10.4.0
 pybind11~=2.13.5
 setuptools~=65.5.0
+biobridge~=0.1.0
+hatchling~=1.27.0

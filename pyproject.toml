@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "biobridge"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
     { name = "Okerew", email = "okerewgroup@proton.me" }
 ]
@@ -70,5 +70,3 @@ exclude_lines = [
 [tool.hatch.build.targets.wheel]
 packages = ["biobridge"]
 
-[tool.hatch.build.hooks.custom]
-path = "hatch_build_ext.py"

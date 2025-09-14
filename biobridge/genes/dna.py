@@ -623,7 +623,6 @@ class DNA:
         :param enzyme_sites: Dictionary of enzyme names and their recognition sequences
         :return: Dictionary of enzyme names and lists of cut site positions
         """
-        sequence = self.get_sequence(1)
         cut_sites = {}
         for enzyme, site in enzyme_sites.items():
             cut_sites[enzyme] = self.find_motif(site)

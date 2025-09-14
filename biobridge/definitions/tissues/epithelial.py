@@ -1,7 +1,7 @@
-import random
 from typing import List, Optional
 
 from biobridge.definitions.cells.epithelial_cell import EpithelialCell
+from biobridge.blocks.tissue import Tissue
 
 
 class EpithelialTissue(Tissue):

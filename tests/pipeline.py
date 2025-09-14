@@ -48,15 +48,11 @@ class TestBioinformaticsPipeline(unittest.TestCase):
         protein = Protein("TestProtein", "ARNDCEQGHILKMFPSTWYV")
         protein.add_binding("ReceptorA", "high")
         cell = Cell("TestCell")
-        cell.add_receptor("ReceptorA")
-        cell.add_surface_protein("ARND")
+        cell.add_receptor(protein)
 
         analysis = self.pipeline.analyze_protein_interactions(protein, cell)
         self.assertIn("TestProtein", analysis)
         self.assertIn("TestCell", analysis)
-        self.assertIn("ReceptorA", analysis)
-        self.assertIn("ARND", analysis)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,7 +10,6 @@ initial_dna = DNA(initial_dna_sequence)
 initial_cell = Cell(
     name="InitialCell",
     cell_type="StemCell",
-    organelles={},
     dna=initial_dna,
     health=100,
     ph=7.4,

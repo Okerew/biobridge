@@ -61,11 +61,7 @@ class Tissue:
 
                 # Apply mutations based on mutation rate
                 if random.random() < self.mutation_rate:
-                    mutation_count = self.apply_mutation(new_cell)
-
-                    # Check if the cell has become cancerous
-                    if mutation_count >= self.mutation_threshold:
-                        new_cell.is_cancerous = True
+                    self.apply_mutation(new_cell)
 
                 new_cells.append(new_cell)
 

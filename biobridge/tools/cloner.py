@@ -32,7 +32,6 @@ class Cloner:
             cell_type=cell.cell_type,
             receptors=cell.receptors.copy(),
             surface_proteins=cell.surface_proteins.copy(),
-            organelles=cell.organelles.copy(),
             dna=cloned_dna,
             health=cell.health,
             ph=cell.ph,
@@ -40,10 +39,9 @@ class Cloner:
             ion_concentrations=cell.ion_concentrations.copy()
         )
         # Clone mitochondria
-        for mitochondrion in cell.mitochondria:
-            cloned_cell.add_mitochondrion(
-                efficiency=mitochondrion.efficiency,
-                health=mitochondrion.health
+        for organelle in cell.organelles:
+            cloned_cell.add_organelle(
+                    organelle, len(cell.organelles)
             )
         # Clone internal proteins
         for protein in cell.internal_proteins:

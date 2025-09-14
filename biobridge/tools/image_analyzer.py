@@ -10,7 +10,6 @@ from biobridge.definitions.cells.epithelial_cell import EpithelialCell
 from biobridge.definitions.cells.somatic_cell import SomaticCell
 from biobridge.blocks.tissue import Tissue
 import matplotlib.pyplot as plt
-from biobridge.definitions.cells.neuron import NeuronCell
 from pyrosetta import pose_from_pdb
 from pyrosetta.toolbox import cleanATOM
 from pyrosetta.rosetta.protocols.rosetta_scripts import XmlObjects
@@ -503,13 +502,13 @@ class ImageAnalyzer:
         :param cell_props: Properties of the cell body
         :param cytoplasm_props: Properties of the cytoplasm
         :param dna: DNA sequence
-        :return: Cell object or Neuron object
+        :return: Cell object
         """
         # Generate DNA sequence based on cell type and image properties
         # Estimate number of mitochondria based on cytoplasm size
         num_mitochondria = max(1, int(cytoplasm_props['area'] / 100))
 
-        # Common properties for both Cell and Neuron
+        # Common properties for both Cell 
         common_props = {
             "name": f"Cell_{index}",
             "cell_type": cell_type,
@@ -517,33 +516,7 @@ class ImageAnalyzer:
             "health": int(100 * (cell_props['mean_intensity'] / 255))  # Assuming 8-bit image
         }
 
-        if cell_type == "neuron":
-            # Create a Neuron object
-            cell = NeuronCell(**common_props)
-
-            # Set neuron-specific properties
-            cell.axon_length = np.random.uniform(100, 1000)  # Random axon length between 100 and 1000 μm
-            cell.dendrite_count = np.random.randint(5, 20)  # Random number of dendrites between 5 and 20
-            cell.neurotransmitters = np.random.choice([
-                "Glutamate",  # Excitatory neurotransmitter
-                "GABA",  # Inhibitory neurotransmitter
-                "Dopamine",  # Involved in reward, motivation, and motor control
-                "Serotonin",  # Regulates mood, sleep, and appetite
-                "Acetylcholine",  # Involved in muscle activation and memory
-                "Norepinephrine",  # Involved in attention, response to stress
-                "Endorphins",  # Natural painkillers, involved in pleasure
-                "Substance P",  # Involved in pain perception
-                "Histamine",  # Involved in immune response and alertness
-                "Oxytocin",  # Involved in social bonding and stress regulation
-                "Enkephalins",  # Involved in pain modulation and stress response
-                "Vasopressin",  # Involved in water retention and social behavior
-                "Nitric Oxide",  # Involved in blood vessel dilation and neurotransmission
-                "Neuropeptide Y",  # Involved in appetite regulation and stress response
-            ],
-                                                      size=np.random.randint(1, 3),
-                                                      replace=False).tolist()
-            cell.synapses = np.random.randint(1000, 10000)  # Random number of synapses
-        elif cell_type == "stem cell":
+        if cell_type == "stem cell":
             # Create a StemCell object
             cell = StemCell(**common_props)
             surface_proteins = [

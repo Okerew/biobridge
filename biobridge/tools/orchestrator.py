@@ -2,9 +2,9 @@ from typing import List, Set, Optional
 import json
 import pickle
 from biobridge.blocks.tissue import Tissue
-from metabolic_network import MetabolicNetwork
+from biobridge.networks.mn import MetabolicNetwork
 from biobridge.networks.grn import GeneRegulatoryNetwork
-from signaling_network import SignalingNetwork
+from biobridge.networks.sn import SignalingNetwork
 
 
 class Orchestrator:

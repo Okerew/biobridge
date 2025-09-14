@@ -2,7 +2,7 @@ import random
 from biobridge.blocks.cell import Cell
 from biobridge.blocks.protein import Protein
 from biobridge.genes.dna import DNA
-from biobridge.tools.orchestrator import Orchestrator, Tissue, NeuralNetwork, MetabolicNetwork, SignalingNetwork, GeneRegulatoryNetwork
+from biobridge.tools.orchestrator import Orchestrator, Tissue, MetabolicNetwork, SignalingNetwork, GeneRegulatoryNetwork
 
 
 # Helper function to create a sample DNA object
@@ -50,21 +50,6 @@ def create_sample_gene_network() -> GeneRegulatoryNetwork:
     return GeneRegulatoryNetwork(receptors, proteins, dna, interactions, binding_sites)
 
 
-# Helper function to create a sample neural network
-def create_sample_neural_network() -> NeuralNetwork:
-    neural_network = NeuralNetwork()
-    neural_network.add_neuron("Input_1", is_input=True)
-    neural_network.add_neuron("Input_2", is_input=True)
-    neural_network.add_neuron("Hidden_1")
-    neural_network.add_neuron("Hidden_2")
-    neural_network.add_neuron("Output_1", is_output=True)
-    neural_network.add_synapse("Input_1", "Hidden_1", weight=0.5)
-    neural_network.add_synapse("Input_2", "Hidden_1", weight=0.5)
-    neural_network.add_synapse("Hidden_1", "Hidden_2", weight=0.5)
-    neural_network.add_synapse("Hidden_2", "Output_1", weight=0.5)
-    return neural_network
-
-
 # Helper function to create a sample metabolic network
 def create_sample_metabolic_network() -> MetabolicNetwork:
     metabolites = ["Metabolite_A", "Metabolite_B", "Metabolite_C", "Metabolite_D"]
@@ -96,7 +81,6 @@ def test_orchestrator():
 
     # Create sample networks
     gene_network = create_sample_gene_network()
-    neural_network = create_sample_neural_network()
     metabolic_network = create_sample_metabolic_network()
     signaling_network = create_sample_signaling_network()
 
@@ -104,7 +88,6 @@ def test_orchestrator():
     orchestrator = Orchestrator(
         tissues=[tissue1, tissue2],
         gene_networks=[gene_network],
-        neural_networks=[neural_network],
         metabolic_networks=[metabolic_network],
         signaling_networks=[signaling_network]
     )
@@ -118,9 +101,6 @@ def test_orchestrator():
     # Simulate gene networks
     orchestrator.simulate_gene_networks(inputs=["Input_Signal_1", "Input_Signal_2"])
 
-    # Simulate neural networks
-    orchestrator.simulate_neural_networks(input_signals={"Input_1": 0.8, "Input_2": 0.6})
-
     # Simulate metabolic networks
     orchestrator.simulate_metabolic_networks(input_metabolites={"Metabolite_A"}, steps=3)
 
@@ -129,7 +109,6 @@ def test_orchestrator():
 
     # Visualize networks
     orchestrator.visualize_gene_networks()
-    orchestrator.visualize_neural_networks()
     orchestrator.visualize_metabolic_networks()
     orchestrator.visualize_signaling_networks()
     print("Test completed successfully.")

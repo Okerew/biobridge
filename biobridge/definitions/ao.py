@@ -32,8 +32,6 @@ class AdvancedOrganism:
         self.max_age = max_age
         self.maturity_age = maturity
         self.sex = sex
-        self.neural_network = None
-        self._setup_neural_network()
         self.immune_system = self._setup_immune_system()
 
     def _setup_immune_system(self):
@@ -78,37 +76,6 @@ class AdvancedOrganism:
 
         return cells
 
-    def _setup_neural_network(self):
-        # Determine the network structure based on the organism's complexity
-        input_neurons = self._determine_input_neurons()
-        hidden_neurons = self._determine_hidden_neurons()
-        output_neurons = self._determine_output_neurons()
-
-        # Initialize the neural network with the determined structure
-        self.neural_network = NeuralNetwork(self.adaptation_rate, False)
-
-        # Add input neurons
-        for i, (name, _) in enumerate(input_neurons):
-            self.neural_network.addNeuron(f"input_{i}", "input", "sigmoid")
-
-        # Add hidden neurons
-        for i in range(hidden_neurons):
-            self.neural_network.addNeuron(f"hidden_{i}", "hidden", "relu")
-
-        # Add output neurons
-        for i, (name, _) in enumerate(output_neurons):
-            self.neural_network.addNeuron(f"output_{i}", "output", "tanh")
-
-        # Connect all input neurons to all hidden neurons
-        for i in range(len(input_neurons)):
-            for j in range(hidden_neurons):
-                self.neural_network.addSynapse(f"input_{i}", f"hidden_{j}", 0.5)
-
-        # Connect all hidden neurons to all output neurons
-        for i in range(hidden_neurons):
-            for j in range(len(output_neurons)):
-                self.neural_network.addSynapse(f"hidden_{i}", f"output_{j}", 0.5)
-
     def _determine_input_neurons(self):
         # Determine input neurons based on the organism's sensors and state
         inputs = [
@@ -149,11 +116,9 @@ class AdvancedOrganism:
 
     def add_system(self, system: System):
         self.systems.append(system)
-        self._setup_neural_network()  # Rebuild the network to include the new system
 
     def add_organ(self, organ: Organ):
         self.organs.append(organ)
-        self._setup_neural_network()  # Rebuild the network to include the new organ
 
     def get_health(self) -> float:
         if not self.systems and not self.organs:
@@ -170,33 +135,6 @@ class AdvancedOrganism:
             else 0
         )
         return (system_health + organ_health) / 2 if self.systems or self.organs else 0
-
-    def process_neural_network(self, external_factors: Optional[List[tuple]] = None):
-        inputs = self.prepare_neural_inputs(external_factors)
-        for i in inputs.values():
-            self.neural_network.propagate(int(i))
-        outputs = self.neural_network.getOutput()
-        self.react_to_neural_output(outputs)
-
-    def prepare_neural_inputs(
-        self, external_factors: Optional[List[tuple]] = None
-    ) -> dict:
-        inputs = {}
-        for i, (name, getter) in enumerate(self._determine_input_neurons()):
-            inputs[f"input_{i}"] = getter()
-
-        # Add external factors if present
-        if external_factors:
-            for i, (factor, intensity) in enumerate(external_factors):
-                inputs[f"input_{len(inputs)}"] = intensity
-
-        return inputs
-
-    def react_to_neural_output(self, outputs: dict):
-        actions = self._determine_output_neurons()
-        for i, (action_name, action_function) in enumerate(actions):
-            if f"output_{i}" in outputs and outputs[f"output_{i}"] > 0.5:
-                action_function()
 
     def _action_rest(self):
         self.energy = min(100, int(self.energy + 10))
@@ -238,31 +176,6 @@ class AdvancedOrganism:
             self.adaptation_rate *= 0.9
         self.adaptation_rate = max(0.05, min(0.2, self.adaptation_rate))
 
-        # Train the neural network based on the organism's current state
-        self.train_neural_network(self.adaptation_rate)
-
-    def train_neural_network(self, learning_rate):
-        inputs = self.prepare_neural_inputs(None)
-        target_outputs = {}
-
-        # Set target outputs based on the organism's current needs
-        actions = self._determine_output_neurons()
-        for i, (action_name, _) in enumerate(actions):
-            if action_name == "rest" and self.energy < 50:
-                target_outputs[f"output_{i}"] = 1.0
-            elif action_name == "eat" and self.energy < 30:
-                target_outputs[f"output_{i}"] = 1.0
-            elif (
-                action_name == "reproduce"
-                and self.energy > 80
-                and self.get_health() > 80
-            ):
-                target_outputs[f"output_{i}"] = 1.0
-            else:
-                target_outputs[f"output_{i}"] = 0.0
-
-        self.neural_network.train(inputs, target_outputs, 10, learning_rate, 0.1)
-
     def describe(self) -> str:
         description = [
             f"Organism Name: {self.name}",
@@ -281,8 +194,6 @@ class AdvancedOrganism:
                 f"{cell_type}: {count}"
                 for cell_type, count in self._count_immune_cells().items()
             ],
-            "\nNeural Network:",
-            f"Number of Neurons: {len(self.neural_network.getNeurons())}",
         ]
         return "\n".join(description)
 
@@ -298,7 +209,6 @@ class AdvancedOrganism:
                 "adaptation_rate": self.adaptation_rate,
                 "mutation_rate": self.mutation_rate,
                 "beneficial_mutation_chance": self.beneficial_mutation_chance,
-                "neural_network": self.neural_network.toJson(),
                 "age": self.age,
                 "max_age": self.max_age,
                 "maturity_age": self.maturity_age,
@@ -319,7 +229,6 @@ class AdvancedOrganism:
         organism.adaptation_rate = data["adaptation_rate"]
         organism.mutation_rate = data["mutation_rate"]
         organism.beneficial_mutation_chance = data["beneficial_mutation_chance"]
-        organism.neural_network.fromJson(data["neural_network"])
         organism.age = data["age"]
         organism.max_age = data["max_age"]
         organism.maturity_age = data["maturity_age"]
@@ -506,7 +415,6 @@ class AdvancedOrganism:
 
         self.regulate_mutations()
         self.adapt()
-        self.process_neural_network(external_factors)
         infection_strength = sum(
             intensity for factor, intensity in external_factors if factor == "toxin"
         )

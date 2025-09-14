@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional, Tuple
-from biobridge.blocks.cell import Cell, DNA
+from biobridge.blocks.cell import Cell, DNA, Protein
 import matplotlib.pyplot as plt
 import json
 from biobridge.definitions.chromosome_pair import ChromosomePair
@@ -35,24 +35,50 @@ class CellCore:
 
 
 class EukaryoticCell(Cell):
-    def __init__(self, name: str, dna: Optional['DNA'] = None, cell_type: Optional[str] = None,
-                 receptors: Optional[List[str]] = None,
-                 surface_proteins: Optional[List[str]] = None,
-                 organelles: Optional[Dict[str, int]] = None,
-                 chromosome_pairs: Optional[List[ChromosomePair]] = None,
-                 health: Optional[int] = None,
-                 age: Optional[int] = 0,
-                 metabolism_rate: Optional[float] = 1.0,
-                 ph: float = 7.0,
-                 osmolarity: float = 300.0,
-                 ion_concentrations: Optional[Dict[str, float]] = None,
-                 id: Optional[int] = None,
-                 structural_integrity: float = 100.0):
+    def __init__(
+        self,
+        name: str,
+        dna: Optional['DNA'] = None,
+        cell_type: Optional[str] = None,
+        receptors: Optional[List[Protein]] = None,
+        surface_proteins: Optional[List[Protein]] = None,
+        organelles: Optional[Dict[str, int]] = None,
+        chromosome_pairs: Optional[List[ChromosomePair]] = None,
+        health: Optional[int] = None,
+        age: Optional[int] = 0,
+        metabolism_rate: Optional[float] = 1.0,
+        ph: float = 7.0,
+        osmolarity: float = 300.0,
+        ion_concentrations: Optional[Dict[str, float]] = None,
+        id: Optional[int] = None,
+        structural_integrity: float = 100.0,
+        mutation_count: Optional[int] = 0,
+        growth_rate: Optional[float] = 1.0,
+        repair_rate: Optional[float] = 1.0,
+        max_divisions: Optional[int] = 50
+    ):
 
-        super().__init__(name, cell_type, receptors, surface_proteins, organelles,
-                         dna, health, age, metabolism_rate, ph, osmolarity,
-                         ion_concentrations, id, structural_integrity=structural_integrity)
-
+        super().__init__(
+            name=name,
+            cell_type=cell_type,
+            receptors=receptors,
+            surface_proteins=surface_proteins,
+            dna=dna,
+            health=health,
+            age=age,
+            metabolism_rate=metabolism_rate,
+            ph=ph,
+            osmolarity=osmolarity,
+            ion_concentrations=ion_concentrations,
+            id=id,
+            chromosomes=None, 
+            structural_integrity=structural_integrity,
+            mutation_count=mutation_count,
+            growth_rate=growth_rate,
+            repair_rate=repair_rate,
+            max_divisions=max_divisions
+        )
+        self.organelles = organelles or {}
         self.core = CellCore(chromosome_pairs)
 
     def add_chromosome_pair(self, chromosome_pair: ChromosomePair):

@@ -1,4 +1,4 @@
-from src.tools.mm import MolecularMachinery, Cell, Protein
+from biobridge.tools.mm import MolecularMachinery, Cell, Protein
 
 # Create common molecular machines
 ribosome = MolecularMachinery.create_ribosome()

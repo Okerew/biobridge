@@ -1,4 +1,4 @@
-from biobridge.signaling_network import SignalingNetwork
+from biobridge.networks.sn import SignalingNetwork
 
 molecules = ["Molecule A", "Molecule B", "Molecule C", "Molecule D"]
 interactions = {

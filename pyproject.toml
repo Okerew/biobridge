@@ -33,8 +33,7 @@ dependencies = [
     "pandas~=2.2.2",
     "okrolearn~=0.2.7",
     "pytesseract~=0.3.13",
-    "pillow~=10.4.0",
-    "pybind11~=2.13.5"
+    "pillow~=10.4.0"
 ]
 
 [project.urls]

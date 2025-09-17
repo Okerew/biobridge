@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "biobridge"
-version = "0.2.1"
+version = "0.2.2"
 authors = [
     { name = "Okerew", email = "okerewgroup@proton.me" }
 ]
@@ -31,9 +31,9 @@ dependencies = [
     "pyserial~=3.5",
     "Flask~=3.0.3",
     "pandas~=2.2.2",
-    "okrolearn~=0.2.7",
     "pytesseract~=0.3.13",
-    "pillow~=10.4.0"
+    "pillow~=10.4.0",
+    "torch~=2.8.0",
 ]
 
 [project.urls]
@@ -68,4 +68,3 @@ exclude_lines = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["biobridge"]
-

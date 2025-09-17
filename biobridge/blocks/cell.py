@@ -755,7 +755,7 @@ class Cell:
             total_weight += self.dna.calculate_molecular_weight()
 
         for chromosome in self.chromosomes:
-            total_weight += chromosome.dna.calculate_molecular_weight()
+            total_weight += chromosome.satellite_dna.calculate_molecular_weight()
 
         total_weight += weights.get('organelles', self.calculate_organelle_weight())
 
@@ -786,7 +786,7 @@ class Cell:
 
         breakdown['dna'] = self.dna.calculate_molecular_weight() if self.dna else 0
 
-        breakdown['chromosomes'] = sum(c.dna.calculate_molecular_weight() for c in self.chromosomes)
+        breakdown['chromosomes'] = sum(c.satellite_dna.calculate_molecular_weight() for c in self.chromosomes)
 
         breakdown['organelles'] = self.calculate_organelle_weight()
 
@@ -799,6 +799,385 @@ class Cell:
 
         return breakdown
 
+    def maintain_homeostasis(self) -> Dict[str, str]:
+        """
+        Maintain cellular homeostasis by regulating internal conditions.
+        """
+        homeostasis_report = {}
+        
+        if self.ph < 6.8:
+            self.ph = min(7.2, self.ph + 0.2)
+            homeostasis_report['ph'] = "Increased pH to maintain balance"
+        elif self.ph > 7.4:
+            self.ph = max(6.8, self.ph - 0.2)
+            homeostasis_report['ph'] = "Decreased pH to maintain balance"
+        
+        if self.osmolarity < 280:
+            self.osmolarity = min(320, self.osmolarity + 20)
+            homeostasis_report['osmolarity'] = "Increased osmolarity"
+        elif self.osmolarity > 320:
+            self.osmolarity = max(280, self.osmolarity - 20)
+            homeostasis_report['osmolarity'] = "Decreased osmolarity"
+        
+        if self.ion_concentrations['Na+'] > 15:
+            self.ion_concentrations['Na+'] = max(10, 
+                                               self.ion_concentrations['Na+'] - 2)
+            homeostasis_report['sodium'] = "Reduced sodium levels"
+        elif self.ion_concentrations['Na+'] < 8:
+            self.ion_concentrations['Na+'] = min(15, 
+                                               self.ion_concentrations['Na+'] + 2)
+            homeostasis_report['sodium'] = "Increased sodium levels"
+        
+        if self.ion_concentrations['K+'] < 130:
+            self.ion_concentrations['K+'] = min(150, 
+                                              self.ion_concentrations['K+'] + 10)
+            homeostasis_report['potassium'] = "Increased potassium levels"
+        elif self.ion_concentrations['K+'] > 150:
+            self.ion_concentrations['K+'] = max(130, 
+                                              self.ion_concentrations['K+'] - 10)
+            homeostasis_report['potassium'] = "Decreased potassium levels"
+        
+        if self.health < 50:
+            repair_amount = min(10, 100 - self.health)
+            self.health += repair_amount
+            homeostasis_report['health'] = f"Emergency repair: +{repair_amount} health"
+        
+        return homeostasis_report
+
+    def autophagy(self) -> Dict[str, int]:
+        """
+        Simulate autophagy - cellular cleanup and recycling process.
+        """
+        recycled_components = {'damaged_proteins': 0, 'damaged_organelles': 0}
+        
+        damaged_proteins = [p for p in self.internal_proteins 
+                           if hasattr(p, 'damaged') and p.damaged]
+        if damaged_proteins:
+            recycled_components['damaged_proteins'] = len(damaged_proteins)
+            self.internal_proteins = [p for p in self.internal_proteins 
+                                    if not (hasattr(p, 'damaged') and p.damaged)]
+        
+        for organelle_type, organelle_list in self.organelles.items():
+            damaged_organelles = [o for o in organelle_list if o.health < 30]
+            if damaged_organelles:
+                recycled_components['damaged_organelles'] += len(damaged_organelles)
+                self.organelles[organelle_type] = [o for o in organelle_list 
+                                                 if o.health >= 30]
+        
+        atp_gain = sum(recycled_components.values()) * 5
+        if atp_gain > 0:
+            self.health = min(100, self.health + atp_gain // 2)
+        
+        return recycled_components
+
+    def apoptosis_check(self) -> bool:
+        """
+        Check if cell should undergo programmed cell death (apoptosis).
+        """
+        apoptosis_signals = 0
+        
+        if self.health < 20:
+            apoptosis_signals += 2
+        if self.structural_integrity < 30:
+            apoptosis_signals += 2
+        if self.mutation_count > 10:
+            apoptosis_signals += 1
+        if self.division_count >= self.max_divisions:
+            apoptosis_signals += 1
+        if self.age > 800:
+            apoptosis_signals += 1
+        
+        return apoptosis_signals >= 3
+
+    def stress_response(self, stressor: str, intensity: float = 1.0) -> str:
+        """
+        Respond to cellular stress conditions.
+        """
+        response = f"Cell experiencing {stressor} stress (intensity: {intensity}). "
+        
+        if stressor == "oxidative":
+            self.health -= int(5 * intensity)
+            self.structural_integrity -= int(3 * intensity)
+            response += "Producing antioxidant enzymes. "
+        elif stressor == "heat":
+            self.metabolism_rate *= (1 - 0.1 * intensity)
+            response += "Producing heat shock proteins. "
+        elif stressor == "osmotic":
+            self.adjust_osmolarity(10 * intensity)
+            response += "Adjusting osmolarity and ion transport. "
+        elif stressor == "nutrient_deprivation":
+            self.health -= int(3 * intensity)
+            autophagy_result = self.autophagy()
+            response += f"Activated autophagy: recycled {autophagy_result}. "
+        elif stressor == "dna_damage":
+            self.mutation_count += int(intensity)
+            self.health -= int(2 * intensity)
+            response += "Activating DNA repair mechanisms. "
+        
+        self.maintain_homeostasis()
+        response += "Homeostasis mechanisms activated."
+        
+        return response
+
+    def protein_synthesis(self, amino_acids: List[str] = None) -> Protein:
+        """
+        Simulate protein synthesis based on DNA/mRNA template.
+        """
+        if not amino_acids:
+            amino_acids = ['A', 'R', 'N', 'D', 'C', 'E', 'Q', 'G', 'H', 'I', 
+                          'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
+        
+        sequence_length = random.randint(50, 300)
+        protein_sequence = ''.join(random.choices(amino_acids, k=sequence_length))
+        
+        new_protein = Protein(f"synthesized_protein_{len(self.internal_proteins)}", 
+                             protein_sequence)
+        self.add_internal_protein(new_protein)
+        
+        energy_cost = sequence_length * 4
+        self.health = max(0, self.health - energy_cost // 10)
+        
+        return new_protein
+
+    def cellular_respiration(self, glucose: float = 1.0, oxygen: float = 1.0) -> Dict[str, float]:
+        """
+        Simulate cellular respiration process.
+        """
+        if glucose <= 0 or oxygen <= 0:
+            return {'atp': 0, 'co2': 0, 'h2o': 0, 'efficiency': 0}
+        
+        base_atp = 38
+        efficiency = min(glucose, oxygen) * self.metabolism_rate
+        
+        atp_produced = base_atp * efficiency
+        co2_produced = 6 * efficiency
+        h2o_produced = 6 * efficiency
+        
+        mitochondria_count = len(self.organelles.get('Mitochondrion', []))
+        if mitochondria_count > 0:
+            atp_produced *= (1 + mitochondria_count * 0.1)
+        
+        self.health = min(100, self.health + int(atp_produced // 10))
+        
+        return {
+            'atp': atp_produced,
+            'co2': co2_produced,
+            'h2o': h2o_produced,
+            'efficiency': efficiency
+        }
+
+    def endocytosis(self, material: str, size: float = 1.0) -> str:
+        """
+        Simulate endocytosis - uptake of external materials.
+        """
+        energy_cost = int(size * 5)
+        
+        if self.health < energy_cost:
+            return f"Insufficient energy for endocytosis of {material}"
+        
+        self.health -= energy_cost
+        
+        if material == "nutrients":
+            self.health = min(100, self.health + int(size * 3))
+            result = f"Successfully absorbed {material} via endocytosis"
+        elif material == "pathogens":
+            self.health -= int(size * 2)
+            result = f"Engulfed {material} - immune response activated"
+        else:
+            result = f"Internalized {material} via endocytosis"
+        
+        return result
+
+    def exocytosis(self, material: str, quantity: float = 1.0) -> str:
+        """
+        Simulate exocytosis - secretion of materials from the cell.
+        """
+        energy_cost = int(quantity * 3)
+        
+        if self.health < energy_cost:
+            return f"Insufficient energy for exocytosis of {material}"
+        
+        self.health -= energy_cost
+        
+        if material == "waste":
+            self.health = min(100, self.health + int(quantity * 2))
+            result = f"Successfully expelled {quantity} units of {material}"
+        elif material == "hormones":
+            result = f"Secreted {quantity} units of {material} for signaling"
+        elif material == "enzymes":
+            result = f"Released {quantity} units of {material} for extracellular activity"
+        else:
+            result = f"Exported {quantity} units of {material}"
+        
+        return result
+
+    def dna_repair(self) -> Dict[str, int]:
+        """
+        Simulate DNA repair mechanisms.
+        """
+        repairs = {'base_excision': 0, 'nucleotide_excision': 0, 'mismatch': 0}
+        
+        if self.dna and hasattr(self.dna, 'damage_count'):
+            damage_count = self.dna.damage_count
+            
+            repairs['base_excision'] = min(damage_count, 
+                                         int(random.uniform(1, 3) * self.repair_rate))
+            damage_count -= repairs['base_excision']
+            
+            repairs['nucleotide_excision'] = min(damage_count, 
+                                               int(random.uniform(0, 2) * self.repair_rate))
+            damage_count -= repairs['nucleotide_excision']
+            
+            repairs['mismatch'] = min(damage_count, 
+                                    int(random.uniform(0, 1) * self.repair_rate))
+            
+            total_repairs = sum(repairs.values())
+            self.dna.damage_count = max(0, self.dna.damage_count - total_repairs)
+            self.mutation_count = max(0, self.mutation_count - total_repairs // 2)
+        
+        for chromosome in self.chromosomes:
+            if hasattr(chromosome.dna, 'damage_count') and chromosome.dna.damage_count > 0:
+                repair_amount = int(random.uniform(0, 2) * self.repair_rate)
+                chromosome.dna.damage_count = max(0, 
+                                                chromosome.dna.damage_count - repair_amount)
+        
+        return repairs
+
+    def cell_cycle_checkpoint(self, phase: str) -> bool:
+        """
+        Check if cell can proceed through cell cycle checkpoints.
+        """
+        if phase == "G1_S":
+            return (self.health > 70 and 
+                    self.structural_integrity > 60 and
+                    len(self.chromosomes) > 0)
+        elif phase == "G2_M":
+            return (self.health > 60 and
+                    self.structural_integrity > 50 and
+                    self.mutation_count < 8)
+        elif phase == "spindle":
+            return (self.health > 50 and
+                    all(hasattr(c, 'replicated') and c.replicated 
+                        for c in self.chromosomes))
+        
+        return False
+
+    def quorum_sensing(self, cell_density: float, signal_molecule: str = "AHL") -> str:
+        """
+        Simulate quorum sensing - density-dependent gene regulation.
+        """
+        threshold_density = 0.6
+        
+        if cell_density < threshold_density:
+            return f"Cell density ({cell_density:.2f}) below threshold. Individual behavior maintained."
+        
+        response = f"Quorum reached! Density: {cell_density:.2f}. "
+        
+        if signal_molecule == "AHL":
+            self.metabolism_rate *= 1.2
+            response += "Increased metabolic activity. "
+        elif signal_molecule == "AI2":
+            if hasattr(self, 'virulence_factors'):
+                self.virulence_factors = True
+            response += "Activated virulence factors. "
+        
+        self.growth_rate *= 0.8
+        response += "Coordinated group behavior initiated."
+        
+        return response
+
+    def differentiate(self, target_type: str, growth_factors: List[str] = None) -> str:
+        """
+        Simulate cellular differentiation into specialized cell types.
+        """
+        if self.cell_type and "differentiated" in self.cell_type:
+            return f"Cell already differentiated as {self.cell_type}"
+        
+        growth_factors = growth_factors or []
+        
+        differentiation_map = {
+            "neuron": {"growth_factors": ["NGF", "BDNF"], "proteins": ["neurofilament", "synapsin"]},
+            "muscle": {"growth_factors": ["IGF1", "FGF"], "proteins": ["actin", "myosin"]},
+            "bone": {"growth_factors": ["BMP", "TGF-beta"], "proteins": ["collagen", "osteocalcin"]},
+            "immune": {"growth_factors": ["IL2", "IL7"], "proteins": ["CD4", "CD8"]}
+        }
+        
+        if target_type not in differentiation_map:
+            return f"Unknown differentiation target: {target_type}"
+        
+        required_factors = differentiation_map[target_type]["growth_factors"]
+        if not all(factor in growth_factors for factor in required_factors):
+            return f"Missing required growth factors: {required_factors}"
+        
+        self.cell_type = f"differentiated_{target_type}"
+        self.metabolism_rate *= 0.7
+        self.growth_rate *= 0.5
+        
+        specialized_proteins = differentiation_map[target_type]["proteins"]
+        for protein_name in specialized_proteins:
+            specialized_protein = Protein(protein_name, "SPECIALIZED_SEQUENCE")
+            self.add_surface_protein(specialized_protein)
+        
+        return f"Successfully differentiated into {target_type} cell"
+
+    def calculate_fitness(self) -> float:
+        """
+        Calculate overall cellular fitness score.
+        """
+        health_score = self.health / 100
+        integrity_score = self.structural_integrity / 100
+        age_penalty = max(0, 1 - self.age / 1000)
+        mutation_penalty = max(0, 1 - self.mutation_count / 20)
+        division_potential = (self.max_divisions - self.division_count) / self.max_divisions
+        
+        organelle_bonus = min(1.0, len(self.organelles) * 0.1)
+        protein_bonus = min(1.0, (len(self.surface_proteins) + len(self.internal_proteins)) * 0.01)
+        
+        fitness = (health_score * 0.3 + 
+                   integrity_score * 0.25 + 
+                   age_penalty * 0.15 + 
+                   mutation_penalty * 0.15 + 
+                   division_potential * 0.15 + 
+                   organelle_bonus * 0.05 + 
+                   protein_bonus * 0.05)
+        
+        return max(0, min(1, fitness))
+
+    def environmental_adaptation(self, environment: Dict[str, float]) -> str:
+        """
+        Adapt to environmental conditions.
+        """
+        adaptation_response = []
+        
+        temperature = environment.get('temperature', 37.0)
+        if temperature < 30:
+            self.metabolism_rate *= 0.8
+            adaptation_response.append("Slowed metabolism for cold adaptation")
+        elif temperature > 42:
+            self.metabolism_rate *= 0.9
+            adaptation_response.append("Heat shock response activated")
+        
+        ph_env = environment.get('ph', 7.4)
+        if abs(ph_env - self.ph) > 1.0:
+            self.adjust_ph((ph_env - self.ph) * 0.3)
+            adaptation_response.append("pH homeostasis adjustment")
+        
+        oxygen = environment.get('oxygen', 1.0)
+        if oxygen < 0.5:
+            self.metabolism_rate *= 0.7
+            adaptation_response.append("Anaerobic metabolism activated")
+        
+        toxins = environment.get('toxins', 0.0)
+        if toxins > 0.1:
+            self.health -= int(toxins * 10)
+            adaptation_response.append("Detoxification mechanisms activated")
+        
+        nutrients = environment.get('nutrients', 1.0)
+        if nutrients < 0.5:
+            adaptation_response.append("Starvation response - autophagy increased")
+        
+        return "; ".join(adaptation_response) if adaptation_response else "No adaptation needed"
+
     def __str__(self) -> str:
         """Return a string representation of the cell."""
         return self.describe()
@@ -807,7 +1186,7 @@ class Cell:
         """Return the length of the cell."""
         return len(self.receptors) + len(self.surface_proteins) + len(self.internal_proteins) + len(self.chromosomes) + len(self.organelles)
 
-    def __getitem__(self, item):
+    def __getitem__(self):
         return Cell.from_dict(self.to_dict())
 
     def __iter__(self):

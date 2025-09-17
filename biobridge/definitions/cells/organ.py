@@ -421,30 +421,6 @@ class OrganCell(Cell):
             if self.health < 50:
                 self.inflammation_markers = min(1.0, self.inflammation_markers + 0.3)
 
-    def autophagy(self):
-        """Perform cellular cleanup through autophagy."""
-        if self.is_active and not self.apoptotic:
-            # Remove damaged organelles and proteins
-            cleanup_efficiency = self.autophagy_activity * (self.health / 100)
-
-            # Reduce oxidative stress
-            stress_reduction = cleanup_efficiency * 0.1
-            self.oxidative_stress = max(0.0, self.oxidative_stress - stress_reduction)
-
-            # Improve functional capacity slightly
-            capacity_improvement = cleanup_efficiency * 0.05
-            self.functional_capacity = min(
-                1.0, self.functional_capacity + capacity_improvement
-            )
-
-            # Consume energy for autophagy
-            energy_cost = cleanup_efficiency * 0.1
-            if hasattr(self, "functional_output"):
-                if "general_metabolism" in self.functional_output:
-                    self.functional_output["general_metabolism"] = max(
-                        0, self.functional_output["general_metabolism"] - energy_cost
-                    )
-
     def respond_to_stress(self, stress_type: str, stress_level: float):
         """Respond to various cellular stresses."""
         stress_resistance_factor = self.stress_resistance

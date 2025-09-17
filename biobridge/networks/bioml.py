@@ -233,13 +233,7 @@ class BioMlWrapper:
     def plot_parameter_changes(self):
         self.logger.warning("plot_parameter_changes not implemented for PyTorch version")
         
-    def set_loss_function(self, loss_function):
-        self.logger.warning("set_loss_function not implemented - specify during training")
-        
-    def deploy_neural_network(self, host='0.0.0.0', port=5000):
-        self.logger.warning("deploy_neural_network not implemented for PyTorch version")
-        
-    def suggest_architecture(self, input_size, output_size, task_type='classification', data_type='tabular', depth=3, temperature=1.0):
+    def suggest_architecture(self, input_size, output_size, task_type='classification'):
         # Simple architecture suggestion
         if task_type == 'classification':
             hidden_sizes = [64, 32]
@@ -255,17 +249,16 @@ class BioMlWrapper:
         self.logger.info(f"Suggested architecture: {architecture}")
         return architecture
         
-    def apply_suggested_architecture(self, input_size, output_size, task_type='classification', data_type='tabular', depth=3):
-        architecture = self.suggest_architecture(input_size, output_size, task_type, data_type, depth)
+    def apply_suggested_architecture(self, input_size, output_size, task_type='classification'):
+        architecture = self.suggest_architecture(input_size, output_size, task_type)
         self.neural_network = PyTorchNeuralNetwork(
             input_size, architecture['hidden_sizes'], output_size
         )
         self.logger.info("Applied suggested architecture")
         
     def train_with_suggested_architecture(self, inputs, targets, input_size, output_size, 
-                                         task_type='classification', data_type='tabular', 
-                                         depth=3, epochs=100, lr=0.01):
-        self.apply_suggested_architecture(input_size, output_size, task_type, data_type, depth)
+                                         task_type='classification', epochs=100, lr=0.01):
+        self.apply_suggested_architecture(input_size, output_size, task_type)
         return self.train_neural_network(inputs, targets, epochs, lr, 
                                        'cross_entropy' if task_type == 'classification' else 'mse')
         

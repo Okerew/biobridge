@@ -128,7 +128,7 @@ class FatTissue(Tissue):
         energy_balance = []
         cell_counts = []
 
-        def update(frame):
+        def update():
             food_intake = random.uniform(0, 2)  # Random food intake
             physical_activity = random.uniform(0, 1)  # Random physical activity
             self.simulate_time_step(food_intake, physical_activity)
@@ -158,6 +158,8 @@ class FatTissue(Tissue):
             ax2.legend()
             ax2.set_title("Energy Balance and Cell Count Over Time")
 
+        for _ in range (num_steps):
+            update()
+
         plt.tight_layout()
         plt.show()
-

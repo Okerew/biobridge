@@ -1,15 +1,21 @@
-from biobridge.definitions.cells.eukaryotic_cell import EukaryoticCell, Optional, Dict, List
+from biobridge.definitions.cells.eukaryotic_cell import EukaryoticCell, Optional, Dict, List, ChromosomePair
 from biobridge.genes.dna import DNA
+
 
 
 class EpithelialCell(EukaryoticCell):
     def __init__(self, name: str, cell_type: Optional[str] = "epithelial cell", receptors: Optional[List[str]] = None,
                  surface_proteins: Optional[List[str]] = None, organelles: Optional[Dict[str, int]] = None,
                  dna: Optional['DNA'] = None, health: Optional[int] = None,
-                 polarity: bool = True, junctions: Optional[Dict[str, bool]] = None, secretion: Optional[Dict[str, float]] = None):
+                 polarity: bool = True, junctions: Optional[Dict[str, bool]] = None, secretion: Optional[Dict[str, float]] = None,
+                 chromosome_pairs: Optional[List[ChromosomePair]] = None, age: Optional[int] = 0,
+                 metabolism_rate: Optional[float] = 1.0, ph: float = 7.0, osmolarity: float = 300.0,
+                 ion_concentrations: Optional[Dict[str, float]] = None, id: Optional[int] = None,
+                 structural_integrity: float = 100.0, mutation_count: Optional[int] = 0,
+                 growth_rate: Optional[float] = 1.0, repair_rate: Optional[float] = 1.0,
+                 max_divisions: Optional[int] = 50):
         """
         Initialize a new EpithelialCell object.
-
         :param name: Name of the cell
         :param cell_type: Type of the cell (default is "epithelial cell")
         :param receptors: List of receptor binding sites on the cell
@@ -20,8 +26,40 @@ class EpithelialCell(EukaryoticCell):
         :param polarity: Boolean indicating if the cell has polarity (apical-basal polarity)
         :param junctions: Dictionary indicating the presence of cell junctions (e.g., tight, adherens, gap junctions)
         :param secretion: Dictionary indicating the secretion rates of various substances (e.g., mucus, enzymes)
+        :param chromosome_pairs: List of chromosome pairs
+        :param age: Age of the cell
+        :param metabolism_rate: Rate of metabolism
+        :param ph: pH level of the cell
+        :param osmolarity: Osmolarity of the cell
+        :param ion_concentrations: Dictionary of ion concentrations
+        :param id: ID of the cell
+        :param structural_integrity: Structural integrity of the cell
+        :param mutation_count: Number of mutations
+        :param growth_rate: Growth rate of the cell
+        :param repair_rate: Repair rate of the cell
+        :param max_divisions: Maximum number of divisions
         """
-        super().__init__(name, cell_type, receptors, surface_proteins, organelles, dna, health)
+        super().__init__(
+            name=name,
+            cell_type=cell_type,
+            receptors=receptors,
+            surface_proteins=surface_proteins,
+            organelles=organelles,
+            dna=dna,
+            health=health,
+            age=age,
+            metabolism_rate=metabolism_rate,
+            ph=ph,
+            osmolarity=osmolarity,
+            ion_concentrations=ion_concentrations,
+            id=id,
+            structural_integrity=structural_integrity,
+            mutation_count=mutation_count,
+            growth_rate=growth_rate,
+            repair_rate=repair_rate,
+            max_divisions=max_divisions,
+            chromosome_pairs=chromosome_pairs
+        )
         self.polarity = polarity
         self.junctions = junctions or {
             "tight_junctions": True,

@@ -49,6 +49,7 @@ cell1.interact_with_protein(protein2)
 
 cell = Cell("MyCell", cell_type="neuron", dna=DNA("ATCG" * 1000))
 cell.add_chromosome(Chromosome(DNA("ATCG" * 1000), "Chromosome 1"))
+cell.maintain_homeostasis()
 
 # Simulate some cell processes
 cell.add_receptor(Protein("Dopamine", "YVWTSRQPNMLKIHGFEDCA"))

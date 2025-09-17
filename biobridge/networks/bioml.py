@@ -14,6 +14,8 @@ from typing import List
 class PyTorchNeuralNetwork(nn.Module):
     def __init__(self, input_size: int, hidden_sizes: List[int] = None, output_size: int = 1):
         super(PyTorchNeuralNetwork, self).__init__()
+        if hidden_sizes is None:
+            hidden_sizes = [64, 32]
         
         layers = []
         prev_size = input_size

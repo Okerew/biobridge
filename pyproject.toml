@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "biobridge"
-version = "0.2.2"
+version = "0.2.3"
 authors = [
     { name = "Okerew", email = "okerewgroup@proton.me" }
 ]

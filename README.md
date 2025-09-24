@@ -71,3 +71,5 @@ SurgicalSimulator()
 ```
 
 To see more examples how to use biobridge see the test files, biobridge works well with jupyter notebooks.
+
+DO NOT USE THIS SOFTWARE FOR MEDICAL ANALYSIS OR ANY DIAGNOSIS, FOR THAT CONTACT A LICENSED MEDICAL EXPERT.

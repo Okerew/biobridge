@@ -8,7 +8,7 @@ from skimage import feature, filters, measure, morphology
 from sklearn.cluster import KMeans
 
 from biobridge.blocks.cell import Cell
-from biobridge.definitions.tissues.bone import BoneTissue
+from biobridge.definitions.tissues.breast import BreastTissue
 
 warnings.filterwarnings("ignore")
 
@@ -936,23 +936,17 @@ Skin Analysis: {'Normal' if analysis_results['skin_analysis']['skin_thickness_no
         self, image, analysis_results, tissue_name: str
     ):
         """
-        Create a breast tissue representation from mammography analysis.
-        Note: This creates a generic tissue object as biobridge may not have specific breast tissue class.
+        Create breast tissue representation from mammography analysis.
 
         :param image: Original mammographic image
         :param analysis_results: Analysis results
         :param tissue_name: Name for the tissue
-        :return: Tissue object with mammography-derived properties
+        :return: BreastTissue object with mammography-derived properties
         """
-        # Extract breast region
         breast_mask = analysis_results["breast_mask"]
-        breast_pixels = image[breast_mask]
-
-        # Calculate tissue characteristics
         density_analysis = analysis_results["density_analysis"]
         cancer_risk_assessment = analysis_results["cancer_risk_assessment"]
 
-        # Estimate cancer risk as percentage
         risk_mapping = {
             "low": 0.01,
             "low-moderate": 0.03,
@@ -961,75 +955,60 @@ Skin Analysis: {'Normal' if analysis_results['skin_analysis']['skin_thickness_no
         }
         cancer_risk = risk_mapping.get(cancer_risk_assessment["risk_level"], 0.01)
 
-        # Create cells based on breast tissue density and findings
-        num_cells = max(
-            10, int(np.sum(breast_mask) / 5000)
-        )  # Base number of cells on breast area
+        mammographic_density = density_analysis["density_percentage"] / 100.0
+        birads_category = density_analysis["birads_category"]
 
+        num_cells = max(10, int(np.sum(breast_mask) / 5000))
         cells = []
 
-        # Create different cell types based on findings
         mass_locations = [
             (m["center"][1], m["center"][0]) for m in analysis_results["masses"]
         ]
         calc_locations = [
-            (c["center"][1], c["center"][0]) for c in analysis_results["calcifications"]
+            (c["center"][1], c["center"][0]) 
+            for c in analysis_results["calcifications"]
         ]
 
         for i in range(num_cells):
-            # Determine cell health based on proximity to suspicious findings
             base_health = random.uniform(85, 98)
 
-            # Reduce health if near suspicious masses
             for mass_loc in mass_locations:
+                y_pos = (i * 100) % image.shape[0]
+                x_pos = (i * 100) // image.shape[0] % image.shape[1]
                 distance = np.sqrt(
-                    (i % image.shape[0] - mass_loc[0]) ** 2
-                    + (i // image.shape[0] - mass_loc[1]) ** 2
+                    (y_pos - mass_loc[0]) ** 2 + (x_pos - mass_loc[1]) ** 2
                 )
-                if distance < 50:  # Within 50 pixels of mass
-                    base_health -= 10
+                if distance < 50:
+                    base_health -= random.uniform(5, 15)
 
-            # Reduce health if near suspicious calcifications
             for calc_loc in calc_locations:
+                y_pos = (i * 100) % image.shape[0]
+                x_pos = (i * 100) // image.shape[0] % image.shape[1]
                 distance = np.sqrt(
-                    (i % image.shape[0] - calc_loc[0]) ** 2
-                    + (i // image.shape[0] - calc_loc[1]) ** 2
+                    (y_pos - calc_loc[0]) ** 2 + (x_pos - calc_loc[1]) ** 2
                 )
-                if distance < 30:  # Within 30 pixels of calcification
-                    base_health -= 5
+                if distance < 30:
+                    base_health -= random.uniform(2, 8)
 
-            # Ensure health stays within reasonable bounds
             cell_health = max(50.0, min(100.0, base_health))
-
             cell_name = f"BreastCell_{i}"
             cells.append(Cell(cell_name, str(cell_health)))
 
-        # Since biobridge might not have a specific breast tissue class,
-        # we'll use BoneTissue as a base and modify its properties
-        # In a real implementation, you'd create a BreastTissue class
-
-        # Map breast density to mineral density equivalent
-        density_mapping = {"A": 0.2, "B": 0.5, "C": 0.8, "D": 1.2}
-        breast_density = density_mapping.get(density_analysis["birads_category"], 0.5)
-
-        # Create tissue object
-        breast_tissue = BoneTissue(
+        breast_tissue = BreastTissue(
             name=tissue_name,
             cells=cells,
             cancer_risk=cancer_risk,
-            mineral_density=breast_density,  # Using this field to represent breast density
+            mammographic_density=mammographic_density,
+            birads_category=birads_category,
         )
 
-        # Modify activity levels based on mammographic findings
-        # Higher suspicion findings suggest more cellular activity
-        activity_modifier = min(0.1, cancer_risk_assessment["risk_score"] * 0.01)
+        activity_modifier = min(0.02, cancer_risk_assessment["risk_score"] * 0.005)
+        breast_tissue.ductal_activity = min(0.1, 0.03 + activity_modifier)
+        breast_tissue.stromal_activity = min(0.1, 0.02 + activity_modifier)
 
-        breast_tissue.osteoclast_activity = (
-            0.02 + activity_modifier
-        )  # Base cellular activity
-        breast_tissue.osteoblast_activity = (
-            0.03 + activity_modifier
-        )  # Base regenerative activity
+        skin_analysis = analysis_results["skin_analysis"]
+        if not skin_analysis["skin_thickness_normal"]:
+            breast_tissue.apply_stress(0.3)
 
         return breast_tissue
 

@@ -5,6 +5,7 @@ from biobridge.genes.dna import DNA
 import math
 import matplotlib.patches as patches
 from biobridge.genes.chromosome import Chromosome
+from biobridge.definitions.enzyme import Enzyme
 
 
 class Organelle:
@@ -38,6 +39,166 @@ class Mitochondrion(Organelle):
     def describe(self) -> str:
         return f"{super().describe()}, ATP Production: {self.atp_production}"
 
+
+class CellularStructure:
+    def __init__(self, name: str, structure_type: str, 
+                 composition: Dict[str, float], integrity: float = 100.0,
+                 permeability: float = 0.1, flexibility: float = 1.0):
+        self.name = name
+        self.structure_type = structure_type
+        self.composition = composition
+        self.integrity = integrity
+        self.permeability = permeability
+        self.flexibility = flexibility
+        self.associated_proteins = []
+        self.transport_channels = []
+
+    def add_protein(self, protein: Protein) -> None:
+        self.associated_proteins.append(protein)
+
+    def damage(self, amount: float) -> None:
+        self.integrity = max(0, self.integrity - amount)
+        if self.integrity < 50:
+            self.permeability *= 1.2
+
+    def repair(self, amount: float) -> None:
+        self.integrity = min(100, self.integrity + amount)
+        if self.integrity > 50:
+            self.permeability = min(self.permeability, 0.1)
+
+
+class CellMembrane(CellularStructure):
+    def __init__(self, phospholipid_ratio: Dict[str, float] = None,
+                 cholesterol_content: float = 0.3):
+        default_lipids = {"phosphatidylcholine": 0.4, 
+                         "phosphatidylethanolamine": 0.25,
+                         "phosphatidylserine": 0.15, 
+                         "sphingomyelin": 0.1, 
+                         "cholesterol": cholesterol_content}
+        composition = phospholipid_ratio or default_lipids
+        
+        super().__init__("cell_membrane", "lipid_bilayer", composition)
+        self.membrane_potential = -70.0
+        self.ion_channels = {}
+        self.transporters = {}
+
+    def add_ion_channel(self, ion: str, channel_protein: Protein, 
+                       conductance: float = 1.0):
+        self.ion_channels[ion] = {"protein": channel_protein, 
+                                 "conductance": conductance, 
+                                 "open": False}
+
+    def open_channel(self, ion: str) -> None:
+        if ion in self.ion_channels:
+            self.ion_channels[ion]["open"] = True
+
+    def close_channel(self, ion: str) -> None:
+        if ion in self.ion_channels:
+            self.ion_channels[ion]["open"] = False
+
+    def calculate_membrane_potential(self, 
+                                   internal_concentrations: Dict[str, float],
+                                   external_concentrations: Dict[str, float]) -> float:
+        R = 8.314
+        T = 310
+        F = 96485
+        
+        potential = 0
+        for ion, internal_conc in internal_concentrations.items():
+            if ion in external_concentrations and ion in self.ion_channels:
+                if self.ion_channels[ion]["open"]:
+                    external_conc = external_concentrations[ion]
+                    conductance = self.ion_channels[ion]["conductance"]
+                    
+                    if ion.endswith("+"):
+                        ion_potential = -(R * T / F) * math.log(
+                            external_conc / internal_conc)
+                    else:
+                        ion_potential = (R * T / F) * math.log(
+                            external_conc / internal_conc)
+                    
+                    potential += ion_potential * conductance
+        
+        self.membrane_potential = potential
+        return potential
+
+
+class Cytoskeleton(CellularStructure):
+    def __init__(self):
+        composition = {"actin": 0.4, "tubulin": 0.3, "intermediate_filaments": 0.3}
+        super().__init__("cytoskeleton", "protein_network", composition)
+        self.microfilaments = []
+        self.microtubules = []
+        self.intermediate_filaments = []
+        self.motor_proteins = []
+
+    def add_microfilament(self, length: float, polarity: str = "plus"):
+        self.microfilaments.append({"length": length, 
+                                   "polarity": polarity, 
+                                   "polymerized": True})
+
+    def add_microtubule(self, length: float, stability: float = 1.0):
+        self.microtubules.append({"length": length, 
+                                 "stability": stability,
+                                 "polymerized": True, 
+                                 "organizing_center": "centrosome"})
+
+    def reorganize(self, signal: str) -> str:
+        response = f"Cytoskeleton reorganization triggered by {signal}. "
+        
+        if signal == "mitosis":
+            for mt in self.microtubules:
+                mt["organizing_center"] = "spindle_pole"
+            response += "Mitotic spindle formation initiated. "
+        elif signal == "cell_migration":
+            for mf in self.microfilaments:
+                if mf["polarity"] == "plus":
+                    mf["length"] *= 1.2
+            response += "Actin polymerization at leading edge enhanced. "
+        elif signal == "mechanical_stress":
+            self.flexibility *= 0.8
+            response += "Increased structural rigidity. "
+        
+        return response
+
+
+class CellWall(CellularStructure):
+    def __init__(self, thickness: float = 0.2, 
+                 composition: Dict[str, float] = None):
+        default_composition = {"cellulose": 0.4, "lignin": 0.3, 
+                             "pectin": 0.2, "hemicellulose": 0.1}
+        super().__init__("cell_wall", "structural", 
+                        composition or default_composition,
+                        integrity=100.0, permeability=0.05, 
+                        flexibility=0.3)
+        self.thickness = thickness
+
+    def reinforce(self, lignin_amount: float) -> None:
+        self.composition["lignin"] = min(0.8, 
+                                       self.composition["lignin"] + lignin_amount)
+        self.flexibility = max(0.1, self.flexibility - lignin_amount * 0.5)
+        self.integrity = min(100, self.integrity + lignin_amount * 10)
+
+
+class Vacuole(CellularStructure):
+    def __init__(self, volume: float = 80.0):
+        composition = {"water": 0.95, "salts": 0.03, "organic_compounds": 0.02}
+        super().__init__("central_vacuole", "storage", composition,
+                        integrity=100.0, permeability=0.8, 
+                        flexibility=1.0)
+        self.volume = volume
+        self.turgor_pressure = 0.5
+
+    def adjust_turgor_pressure(self, water_uptake: float) -> None:
+        self.turgor_pressure = max(0, min(1.0, 
+                                  self.turgor_pressure + water_uptake * 0.1))
+        self.volume = 80.0 + (self.turgor_pressure * 20.0)
+
+    def store_metabolite(self, metabolite: str, amount: float) -> None:
+        if metabolite not in self.composition:
+            self.composition[metabolite] = 0
+        self.composition[metabolite] = min(0.1, 
+                                         self.composition[metabolite] + amount)
 
 class Cell:
     def __init__(self, name: str, cell_type: Optional[str] = None, receptors: Optional[List[Protein]] = None,
@@ -421,7 +582,7 @@ class Cell:
 
         if self.chromosomes:
             chromosome = random.choice(self.chromosomes)
-            chromosome.dna.random_mutate()
+            chromosome.random_mutate()
 
     def to_json(self) -> str:
         """Return a JSON representation of the cell, including chemical characteristics."""
@@ -512,7 +673,7 @@ class Cell:
         return {
             'name': self.name,
             'cell_type': self.cell_type,
-            'chromosomes': [{'name': c.name, 'dna': c.dna.to_dict()} for c in self.chromosomes],
+            'chromosomes': [{'dna': c.to_dict()} for c in self.chromosomes],
             'receptors': self.receptors,
             'surface_proteins': self.surface_proteins,
             'health': self.health,
@@ -1011,38 +1172,6 @@ class Cell:
         
         return result
 
-    def dna_repair(self) -> Dict[str, int]:
-        """
-        Simulate DNA repair mechanisms.
-        """
-        repairs = {'base_excision': 0, 'nucleotide_excision': 0, 'mismatch': 0}
-        
-        if self.dna and hasattr(self.dna, 'damage_count'):
-            damage_count = self.dna.damage_count
-            
-            repairs['base_excision'] = min(damage_count, 
-                                         int(random.uniform(1, 3) * self.repair_rate))
-            damage_count -= repairs['base_excision']
-            
-            repairs['nucleotide_excision'] = min(damage_count, 
-                                               int(random.uniform(0, 2) * self.repair_rate))
-            damage_count -= repairs['nucleotide_excision']
-            
-            repairs['mismatch'] = min(damage_count, 
-                                    int(random.uniform(0, 1) * self.repair_rate))
-            
-            total_repairs = sum(repairs.values())
-            self.dna.damage_count = max(0, self.dna.damage_count - total_repairs)
-            self.mutation_count = max(0, self.mutation_count - total_repairs // 2)
-        
-        for chromosome in self.chromosomes:
-            if hasattr(chromosome.dna, 'damage_count') and chromosome.dna.damage_count > 0:
-                repair_amount = int(random.uniform(0, 2) * self.repair_rate)
-                chromosome.dna.damage_count = max(0, 
-                                                chromosome.dna.damage_count - repair_amount)
-        
-        return repairs
-
     def cell_cycle_checkpoint(self, phase: str) -> bool:
         """
         Check if cell can proceed through cell cycle checkpoints.
@@ -1177,6 +1306,194 @@ class Cell:
             adaptation_response.append("Starvation response - autophagy increased")
         
         return "; ".join(adaptation_response) if adaptation_response else "No adaptation needed"
+
+
+    def add_enzyme(self, enzyme: Enzyme) -> None:
+        if isinstance(enzyme, Enzyme):
+            if not hasattr(self, 'enzymes'):
+                self.enzymes = []
+            self.enzymes.append(enzyme)
+            self.internal_proteins.append(enzyme)
+        else:
+            raise TypeError("Must be an Enzyme object")
+
+    def remove_enzyme(self, enzyme_name: str) -> None:
+        if hasattr(self, 'enzymes'):
+            self.enzymes = [e for e in self.enzymes if e.name != enzyme_name]
+        self.internal_proteins = [p for p in self.internal_proteins 
+                                 if p.name != enzyme_name]
+
+    def add_cellular_structure(self, structure: CellularStructure) -> None:
+        if not hasattr(self, 'cellular_structures'):
+            self.cellular_structures = {}
+        self.cellular_structures[structure.name] = structure
+
+    def get_structure(self, structure_name: str) -> Optional[CellularStructure]:
+        if hasattr(self, 'cellular_structures'):
+            return self.cellular_structures.get(structure_name)
+        return None
+
+    def metabolic_pathway_analysis(self, pathway_name: str = "glycolysis") -> Dict[str, float]:
+        if not hasattr(self, 'enzymes'):
+            return {"error": "No enzymes present"}
+        
+        pathway_enzymes = [e for e in self.enzymes 
+                          if pathway_name.lower() in e.name.lower()]
+        
+        if not pathway_enzymes:
+            return {"error": f"No enzymes found for {pathway_name} pathway"}
+        
+        glucose_concentration = 5.0
+        conditions = {"ph": self.ph, "temperature": 37.0}
+        
+        total_atp = 0
+        metabolites = {}
+        
+        for enzyme in pathway_enzymes:
+            activity = enzyme.catalyze(glucose_concentration, **conditions)
+            
+            if "kinase" in enzyme.name.lower():
+                total_atp -= 1
+            elif "synthase" in enzyme.name.lower() or "dehydrogenase" in enzyme.name.lower():
+                total_atp += 2
+            
+            metabolites[enzyme.product] = activity
+        
+        return {"net_atp": total_atp, "metabolites": metabolites, 
+               "pathway_flux": sum(metabolites.values())}
+
+    def enzyme_regulation(self, enzyme_name: str, regulation_type: str, 
+                         factor: float = 1.5) -> str:
+        if not hasattr(self, 'enzymes'):
+            return "No enzymes present in cell"
+        
+        target_enzyme = None
+        for enzyme in self.enzymes:
+            if enzyme.name == enzyme_name:
+                target_enzyme = enzyme
+                break
+        
+        if not target_enzyme:
+            return f"Enzyme {enzyme_name} not found"
+        
+        if regulation_type == "activate":
+            target_enzyme.activity *= factor
+            return f"{enzyme_name} activity increased by {factor}x"
+        elif regulation_type == "inhibit":
+            target_enzyme.activity /= factor
+            return f"{enzyme_name} activity decreased by {factor}x"
+        elif regulation_type == "allosteric":
+            if target_enzyme.is_allosteric:
+                return f"{enzyme_name} allosteric regulation applied"
+            else:
+                return f"{enzyme_name} is not allosterically regulated"
+        
+        return "Unknown regulation type"
+
+    def structural_integrity_detailed(self) -> Dict[str, float]:
+        integrity_breakdown = {"overall": self.structural_integrity}
+        
+        if hasattr(self, 'cellular_structures'):
+            for name, structure in self.cellular_structures.items():
+                integrity_breakdown[name] = structure.integrity
+        
+        if hasattr(self, 'enzymes'):
+            avg_enzyme_activity = sum(e.activity for e in self.enzymes) / len(self.enzymes)
+            integrity_breakdown["enzymatic_function"] = avg_enzyme_activity * 100
+        
+        return integrity_breakdown
+
+    def simulate_enzyme_kinetics(self, enzyme_name: str, 
+                               substrate_concentrations: List[float]) -> Dict[str, List[float]]:
+        if not hasattr(self, 'enzymes'):
+            return {"error": "No enzymes present"}
+        
+        target_enzyme = None
+        for enzyme in self.enzymes:
+            if enzyme.name == enzyme_name:
+                target_enzyme = enzyme
+                break
+        
+        if not target_enzyme:
+            return {"error": f"Enzyme {enzyme_name} not found"}
+        
+        conditions = {"ph": self.ph, "temperature": 37.0}
+        reaction_rates = []
+        
+        for conc in substrate_concentrations:
+            rate = target_enzyme.catalyze(conc, **conditions)
+            reaction_rates.append(rate)
+        
+        return {"substrate_concentrations": substrate_concentrations,
+               "reaction_rates": reaction_rates,
+               "km": target_enzyme.km,
+               "vmax": target_enzyme.vmax}
+
+    def initialize_basic_enzymes(self) -> None:
+        basic_enzymes = [
+            Enzyme("hexokinase", "HEXOKINASE_SEQ", "glucose", "glucose-6-phosphate",
+                   km=0.1, vmax=15.0, cofactors=["ATP", "Mg2+"]),
+            Enzyme("phosphofructokinase", "PFK_SEQ", "fructose-6-phosphate", 
+                   "fructose-1,6-bisphosphate", km=0.5, vmax=25.0, 
+                   cofactors=["ATP"], inhibitors=["citrate", "ATP"]),
+            Enzyme("pyruvate_kinase", "PK_SEQ", "phosphoenolpyruvate", "pyruvate",
+                   km=0.3, vmax=30.0, cofactors=["ADP", "Mg2+"]),
+            Enzyme("lactate_dehydrogenase", "LDH_SEQ", "pyruvate", "lactate",
+                   km=0.2, vmax=20.0, cofactors=["NADH"]),
+            Enzyme("catalase", "CATALASE_SEQ", "hydrogen_peroxide", "water",
+                   km=25.0, vmax=100.0, cofactors=["heme"])
+        ]
+        
+        for enzyme in basic_enzymes:
+            self.add_enzyme(enzyme)
+
+    def initialize_cellular_structures(self) -> None:
+        membrane = CellMembrane()
+        membrane.add_ion_channel("Na+", Protein("sodium_channel", "NA_CHANNEL_SEQ"))
+        membrane.add_ion_channel("K+", Protein("potassium_channel", "K_CHANNEL_SEQ"))
+        membrane.add_ion_channel("Ca2+", Protein("calcium_channel", "CA_CHANNEL_SEQ"))
+        
+        cytoskeleton = Cytoskeleton()
+        cytoskeleton.add_microfilament(50.0, "plus")
+        cytoskeleton.add_microtubule(100.0, 0.8)
+        
+        nucleus_structure = CellularStructure("nucleus", "organelle", 
+                                            {"chromatin": 0.6, "nucleoplasm": 0.4})
+        
+        self.add_cellular_structure(membrane)
+        self.add_cellular_structure(cytoskeleton)
+        self.add_cellular_structure(nucleus_structure)
+
+    def add_cell_wall(self, thickness: float = 0.2, 
+                       composition: Dict[str, float] = None,
+                       quantity: int = 1) -> None:
+        """
+        Add a cell wall to the cell.
+        
+        :param thickness: Thickness of the cell wall
+        :param composition: Dictionary of cell wall composition
+        :param quantity: Number of cell walls to add
+        """
+        cell_wall = CellWall(thickness, composition)
+        self.add_cellular_structure(cell_wall)
+        
+        if "CellWall" not in self.organelles:
+            self.organelles["CellWall"] = []
+        self.organelles["CellWall"].extend([cell_wall] * quantity)
+
+    def add_vacuole(self, volume: float = 80.0, quantity: int = 1) -> None:
+        """
+        Add a vacuole to the cell.
+        
+        :param volume: Volume of the vacuole
+        :param quantity: Number of vacuoles to add
+        """
+        vacuole = Vacuole(volume)
+        self.add_cellular_structure(vacuole)
+        
+        if "Vacuole" not in self.organelles:
+            self.organelles["Vacuole"] = []
+        self.organelles["Vacuole"].extend([vacuole] * quantity)
 
     def __str__(self) -> str:
         """Return a string representation of the cell."""

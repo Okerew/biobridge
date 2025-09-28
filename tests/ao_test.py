@@ -1,4 +1,4 @@
-from biobridge.definitions.ao import AdvancedOrganism, DNA
+from biobridge.definitions.organisms.ao import AdvancedOrganism, DNA
 
 
 def test_advanced_organism_neural_network():

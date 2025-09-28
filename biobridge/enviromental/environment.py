@@ -4,7 +4,7 @@ from biobridge.blocks.cell import Cell
 from biobridge.blocks.tissue import Tissue
 import json
 from biobridge.definitions.organism import Organism
-from biobridge.definitions.ao import AdvancedOrganism
+from biobridge.definitions.organisms.ao import AdvancedOrganism
 
 
 class Substance:

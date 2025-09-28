@@ -1,6 +1,6 @@
 import unittest
 from biobridge.blocks.tissue import Tissue
-from biobridge.tools.bioreactor import Bioreactor  # Assuming your class is in biobridge.blocks.bioreactor.py
+from biobridge.tools.bioreactor import Bioreactor  
 
 
 class TestBioreactor(unittest.TestCase):

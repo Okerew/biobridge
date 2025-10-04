@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "biobridge"
-version = "0.2.5"
+version = "0.2.6"
 authors = [
     { name = "Okerew", email = "okerewgroup@proton.me" }
 ]
@@ -25,10 +25,6 @@ dependencies = [
     "scikit-image~=0.24.0",
     "networkx~=3.3",
     "biopython~=1.84",
-    "requests~=2.32.3",
-    "pyusb~=1.2.1",
-    "opcua~=0.98.13",
-    "pyserial~=3.5",
     "Flask~=3.0.3",
     "pandas~=2.2.2",
     "pytesseract~=0.3.13",

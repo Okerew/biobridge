@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "pybind11", "setuptools~=65.5.0"]
+requires = ["hatchling", "setuptools~=65.5.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -25,6 +25,7 @@ dependencies = [
     "scikit-image~=0.24.0",
     "networkx~=3.3",
     "biopython~=1.84",
+    "requests~=2.32.3",
     "Flask~=3.0.3",
     "pandas~=2.2.2",
     "pytesseract~=0.3.13",
@@ -64,4 +65,3 @@ exclude_lines = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["biobridge"]
-

@@ -1,8 +1,6 @@
-# biobridge
+# <img src="biobridge.png" alt="Biobridge Logo" width=25px height=25px> biobridge
 
-<a href="https://youtu.be/v-sujCAOxCQ">
-<img src="biobridge.png" alt="Biobridge Logo">
-</a>
+[![Watch the demo](biobridge.gif)](https://youtu.be/NJjOs8crb50?si=crlh7BSLSodye2MS)
 
 Biobridge is a Python library for simulating biological processes and systems also analyzing them, visualising them, and interacting with them.
 
@@ -73,3 +71,4 @@ SurgicalSimulator()
 To see more examples how to use biobridge see the test files, biobridge works well with jupyter notebooks.
 
 DO NOT USE THIS SOFTWARE FOR MEDICAL ANALYSIS OR ANY DIAGNOSIS, FOR THAT CONTACT A LICENSED MEDICAL EXPERT.
+

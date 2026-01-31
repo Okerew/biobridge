@@ -20,6 +20,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import os
 from biobridge.blocks.protein import Protein
+from biobridge.definitions.tissues.neural import NeuralTissue, Neuron
 
 
 class ImageAnalyzer:
@@ -424,6 +425,509 @@ class ImageAnalyzer:
             'arrows': arrows
         }
 
+    def analyze_neuron_morphology(
+            self, image, nucleus_props: Dict, cell_props: Dict,
+    ) -> Dict[str, float]:
+        soma_diameter = 2 * np.sqrt(nucleus_props['area'] / np.pi)
+
+        soma_perimeter = nucleus_props['perimeter']
+        soma_circularity = (
+            4 * np.pi * nucleus_props['area'] / (soma_perimeter ** 2)
+            if soma_perimeter > 0 else 0
+        )
+
+        nucleus_labeled = self.identify_primary_objects(image)
+        cell_bodies_labeled = self.identify_secondary_objects(nucleus_labeled)
+
+        nucleus_mask = nucleus_labeled == nucleus_props['label']
+        cell_mask = cell_bodies_labeled == cell_props['label']
+
+        skeleton = morphology.skeletonize(cell_mask)
+        distance_transform = ndimage.distance_transform_edt(cell_mask)
+
+        process_pixels = skeleton & ~nucleus_mask
+        process_lengths = np.sum(process_pixels)
+
+        labeled_processes = measure.label(process_pixels)
+        process_count = np.max(labeled_processes)
+
+        branch_points = self._detect_branch_points(skeleton)
+        branch_density = (
+            np.sum(branch_points) / process_lengths
+            if process_lengths > 0 else 0
+        )
+
+        process_diameters = distance_transform[process_pixels] * 2
+        avg_process_diameter = (
+            np.mean(process_diameters) if len(process_diameters) > 0 else 0
+        )
+
+        max_distance = np.max(
+            distance_transform[nucleus_mask]
+        ) if np.any(nucleus_mask) else 0
+        estimated_axon_length = max_distance * 2
+
+        return {
+            "soma_diameter": soma_diameter,
+            "soma_circularity": soma_circularity,
+            "process_count": int(process_count),
+            "total_process_length": float(process_lengths),
+            "branch_density": branch_density,
+            "average_process_diameter": avg_process_diameter,
+            "estimated_axon_length": estimated_axon_length,
+            "arbor_complexity": process_count * branch_density
+        }
+
+    def _detect_branch_points(self, skeleton):
+        kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=np.uint8)
+        neighbor_count = ndimage.convolve(
+            skeleton.astype(np.uint8), kernel, mode='constant'
+        )
+        return (neighbor_count > 2) & skeleton
+
+    def estimate_myelination(
+            self, image, cell_props: Dict
+    ) -> Dict[str, float]:
+        img_array = self.ij.py.from_java(image)
+        if hasattr(img_array, 'values'):
+            img_array = img_array.values
+
+        nucleus_labeled = self.identify_primary_objects(image)
+        cell_bodies_labeled = self.identify_secondary_objects(nucleus_labeled)
+        cell_mask = cell_bodies_labeled == cell_props['label']
+
+        nucleus_mask = nucleus_labeled > 0
+
+        process_mask = cell_mask & ~nucleus_mask
+
+        process_intensities = img_array[process_mask]
+
+        if len(process_intensities) == 0:
+            return {
+                "myelin_thickness": 0.0,
+                "myelination_index": 0.0,
+                "is_myelinated": False
+            }
+
+        intensity_std = np.std(process_intensities)
+        intensity_mean = np.mean(process_intensities)
+
+        peripheral_ring = morphology.binary_dilation(
+            process_mask, morphology.disk(2)
+        ) & ~process_mask
+        peripheral_intensity = (
+            np.mean(img_array[peripheral_ring])
+            if np.any(peripheral_ring) else intensity_mean
+        )
+
+        intensity_contrast = (
+            peripheral_intensity / intensity_mean
+            if intensity_mean > 0 else 1.0
+        )
+
+        is_myelinated = intensity_contrast > 1.2 and intensity_std > 15
+
+        myelin_thickness = 0.0
+        if is_myelinated:
+            distance_transform = ndimage.distance_transform_edt(process_mask)
+            avg_process_radius = np.mean(distance_transform[process_mask])
+            myelin_thickness = max(0, avg_process_radius * 0.3)
+
+        myelination_index = (
+            intensity_contrast * (intensity_std / 50)
+            if is_myelinated else 0.0
+        )
+
+        return {
+            "myelin_thickness": myelin_thickness,
+            "myelination_index": min(1.0, myelination_index),
+            "is_myelinated": is_myelinated,
+            "intensity_contrast": intensity_contrast
+        }
+
+    def analyze_synaptic_markers(
+            self, image, cell_props: Dict
+    ) -> Dict[str, any]:
+        img_array = self.ij.py.from_java(image)
+        if hasattr(img_array, 'values'):
+            img_array = img_array.values
+
+        nucleus_labeled = self.identify_primary_objects(image)
+        cell_bodies_labeled = self.identify_secondary_objects(nucleus_labeled)
+        cell_mask = cell_bodies_labeled == cell_props['label']
+
+        nucleus_mask = nucleus_labeled > 0
+        process_mask = cell_mask & ~nucleus_mask
+
+        if not np.any(process_mask):
+            return {
+                "estimated_synapse_count": 0,
+                "synaptic_density": 0.0,
+                "puncta_locations": []
+            }
+
+        process_img = img_array * process_mask
+
+        local_maxima = morphology.local_maxima(
+            filters.gaussian(process_img, sigma=1.5)
+        )
+
+        threshold = filters.threshold_otsu(process_img[process_mask])
+        bright_puncta = (process_img > threshold * 1.3) & process_mask
+
+        labeled_puncta = measure.label(bright_puncta & local_maxima)
+        puncta_props = measure.regionprops(labeled_puncta)
+
+        valid_puncta = [
+            p for p in puncta_props
+            if 2 <= p.area <= 50 and p.mean_intensity > threshold
+        ]
+
+        puncta_locations = [
+            {"centroid": p.centroid, "intensity": p.mean_intensity}
+            for p in valid_puncta
+        ]
+
+        process_area = np.sum(process_mask)
+        synaptic_density = (
+            len(valid_puncta) / process_area * 1000
+            if process_area > 0 else 0
+        )
+
+        estimated_synapse_count = int(len(valid_puncta) * 5)
+
+        return {
+            "estimated_synapse_count": estimated_synapse_count,
+            "synaptic_density": synaptic_density,
+            "puncta_count": len(valid_puncta),
+            "puncta_locations": puncta_locations
+        }
+
+    def classify_neuron_type(
+            self, morphology_data: Dict, synapse_data: Dict,
+            myelination_data: Dict
+    ) -> str:
+        process_count = morphology_data.get('process_count', 0)
+        arbor_complexity = morphology_data.get('arbor_complexity', 0)
+        is_myelinated = myelination_data.get('is_myelinated', False)
+        synaptic_density = synapse_data.get('synaptic_density', 0)
+
+        if process_count == 1 and is_myelinated:
+            return "unipolar_neuron"
+        elif process_count == 2:
+            return "bipolar_neuron"
+        elif process_count >= 3:
+            if arbor_complexity > 5 and synaptic_density > 0.1:
+                return "multipolar_pyramidal_neuron"
+            elif arbor_complexity > 3:
+                return "multipolar_stellate_neuron"
+            else:
+                return "multipolar_neuron"
+        else:
+            return "unclassified_neuron"
+
+    def estimate_neurotransmitter_type(
+            self, image, cell_props: Dict
+    ) -> List[str]:
+        img_array = self.ij.py.from_java(image)
+        if hasattr(img_array, 'values'):
+            img_array = img_array.values
+
+        nucleus_labeled = self.identify_primary_objects(image)
+        cell_bodies_labeled = self.identify_secondary_objects(nucleus_labeled)
+        cell_mask = cell_bodies_labeled == cell_props['label']
+
+        cell_intensity = np.mean(img_array[cell_mask])
+        cell_area = cell_props['area']
+        eccentricity = cell_props.get('eccentricity', 0.5)
+
+        neurotransmitters = []
+
+        if cell_intensity > 120:
+            neurotransmitters.append("glutamate")
+
+        if 80 <= cell_intensity <= 120 and cell_area > 1000:
+            neurotransmitters.append("GABA")
+
+        if cell_intensity < 100 and eccentricity > 0.7:
+            neurotransmitters.append("dopamine")
+
+        if cell_area > 1500 and cell_intensity > 100:
+            neurotransmitters.append("acetylcholine")
+
+        if len(neurotransmitters) == 0:
+            neurotransmitters.append("glutamate")
+
+        return neurotransmitters
+
+    def analyze_mitochondrial_distribution_neuron(
+            self, image, cell_props: Dict
+    ) -> Dict[str, float]:
+        img_array = self.ij.py.from_java(image)
+        if hasattr(img_array, 'values'):
+            img_array = img_array.values
+
+        enhanced = filters.meijering(img_array)
+        thresh = filters.threshold_otsu(enhanced)
+        binary = enhanced > thresh
+
+        nucleus_labeled = self.identify_primary_objects(image)
+        cell_bodies_labeled = self.identify_secondary_objects(nucleus_labeled)
+        cell_mask = cell_bodies_labeled == cell_props['label']
+
+        nucleus_mask = nucleus_labeled > 0
+
+        soma_mask = cell_mask & nucleus_mask
+        process_mask = cell_mask & ~nucleus_mask
+
+        mito_in_cell = binary & cell_mask
+        mito_in_soma = binary & soma_mask
+        mito_in_processes = binary & process_mask
+
+        soma_area = np.sum(soma_mask)
+        process_area = np.sum(process_mask)
+
+        soma_density = (
+            np.sum(mito_in_soma) / soma_area if soma_area > 0 else 0
+        )
+        process_density = (
+            np.sum(mito_in_processes) / process_area
+            if process_area > 0 else 0
+        )
+
+        labeled_mito = measure.label(mito_in_cell)
+        mito_count = np.max(labeled_mito)
+
+        return {
+            "total_mitochondria": int(mito_count),
+            "soma_mitochondrial_density": soma_density,
+            "process_mitochondrial_density": process_density,
+            "density_ratio": (
+                soma_density / process_density
+                if process_density > 0 else 1.0
+            )
+        }
+
+    def create_neuron_object(
+            self, index: int, cell_props: Dict, 
+            nucleus_props: Dict, image, dna: Optional[str] = None
+    ) -> Neuron:
+        morphology = self.analyze_neuron_morphology(
+            image, nucleus_props, cell_props
+        )
+
+        myelination = self.estimate_myelination(image, cell_props)
+
+        synapse_data = self.analyze_synaptic_markers(image, cell_props)
+
+        neuron_type = self.classify_neuron_type(
+            morphology, synapse_data, myelination
+        )
+
+        neurotransmitters = self.estimate_neurotransmitter_type(
+            image, cell_props
+        )
+
+        mito_distribution = self.analyze_mitochondrial_distribution_neuron(
+            image, cell_props
+        )
+
+        common_props = {
+            "name": f"Neuron_{index}",
+            "cell_type": "neuron",
+            "dna": dna,
+            "health": int(100 * (cell_props['mean_intensity'] / 255))
+        }
+
+        neuron = Neuron(
+            **common_props,
+            cell_type=neuron_type,
+            soma_diameter=morphology['soma_diameter'],
+            axon_length=morphology['estimated_axon_length'],
+            axon_diameter=morphology['average_process_diameter'],
+            dendrite_count=int(max(1, morphology['process_count'] - 1)),
+            dendrite_branch_density=min(1.0, morphology['branch_density'] * 10),
+            myelin_thickness=myelination['myelin_thickness'],
+            synapse_count=synapse_data['estimated_synapse_count'],
+            neurotransmitter_types=neurotransmitters
+        )
+
+        neuron_receptors = [
+            "NMDA Receptors",
+            "AMPA Receptors",
+            "GABA_A Receptors",
+            "Voltage-gated Na+ Channels",
+            "Voltage-gated K+ Channels",
+            "Voltage-gated Ca2+ Channels"
+        ]
+
+        neuron_surface_proteins = [
+            "Neural Cell Adhesion Molecule (NCAM)",
+            "L1CAM",
+            "Synaptophysin",
+            "PSD-95",
+            "Neuroligin",
+            "Neurexin"
+        ]
+
+        neuron.receptors = np.random.choice(
+            neuron_receptors, size=np.random.randint(3, 5), replace=False
+        ).tolist()
+        neuron.surface_proteins = np.random.choice(
+            neuron_surface_proteins,
+            size=np.random.randint(2, 4),
+            replace=False
+        ).tolist()
+
+        neuron.add_organelle(Organelle("nucleus", 1))
+
+        num_mitochondria = mito_distribution['total_mitochondria']
+        for _ in range(num_mitochondria):
+            neuron.add_mitochondrion(
+                efficiency=np.random.uniform(0.85, 1.0), health=100
+            )
+
+        neuron.metabolism_rate = 1.2 + (
+                synapse_data['synaptic_density'] * 0.5
+        )
+
+        return neuron
+
+    def create_neural_tissue_object(
+            self, index: int, tissue_type: str, tissue_props: Dict,
+            neurons: List[Neuron]
+    ) -> NeuralTissue:
+        tissue_name = f"NeuralTissue_{index}"
+
+        if not neurons:
+            return NeuralTissue(
+                name=tissue_name,
+                tissue_type="nervous",
+                cells=neurons,
+                cancer_risk=0.0001
+            )
+
+        avg_synapse_count = np.mean([n.synapse_count for n in neurons])
+
+        myelinated_count = sum(
+            1 for n in neurons if n.myelin_thickness > 0
+        )
+        myelination_pct = myelinated_count / len(neurons)
+
+        avg_health = np.mean([n.health for n in neurons])
+
+        neural_density = len(neurons) / tissue_props.get('area', 1000)
+
+        synaptic_connectivity = min(1.0, avg_synapse_count / 1000 * 0.7)
+
+        vascularization = 0.8 if avg_health > 70 else 0.6
+
+        neural_tissue = NeuralTissue(
+            name=tissue_name,
+            tissue_type=tissue_type,
+            cells=neurons,
+            cancer_risk=0.0001,
+            neural_density=neural_density,
+            synaptic_connectivity=synaptic_connectivity,
+            myelination_percentage=myelination_pct,
+            vascularization=vascularization
+        )
+
+        neural_tissue.growth_rate = 0.01
+        neural_tissue.healing_rate = 0.05 * (avg_health / 100)
+
+        if avg_health < 50:
+            neural_tissue.blood_brain_barrier_integrity = 70.0
+
+        neural_tissue.neurotrophic_factor_concentration = avg_health / 100
+
+        return neural_tissue
+
+    def analyze_neural_connectivity_patterns(
+            self, neurons_props: List[Dict]
+    ) -> Dict[str, any]:
+        if len(neurons_props) < 2:
+            return {"connectivity_matrix": [], "network_metrics": {}}
+
+        connectivity_matrix = np.zeros(
+            (len(neurons_props), len(neurons_props))
+        )
+
+        for i, neuron_i in enumerate(neurons_props):
+            for j, neuron_j in enumerate(neurons_props):
+                if i == j:
+                    continue
+
+                centroid_i = np.array(neuron_i['centroid'])
+                centroid_j = np.array(neuron_j['centroid'])
+
+                distance = np.linalg.norm(centroid_i - centroid_j)
+
+                max_distance = 500
+                if distance < max_distance:
+                    connection_strength = 1 - (distance / max_distance)
+                    connectivity_matrix[i, j] = connection_strength
+
+        avg_connectivity = np.mean(connectivity_matrix[connectivity_matrix > 0])
+
+        node_degrees = np.sum(connectivity_matrix > 0.3, axis=1)
+        avg_degree = np.mean(node_degrees)
+
+        hub_neurons = np.where(node_degrees > avg_degree * 1.5)[0]
+
+        return {
+            "connectivity_matrix": connectivity_matrix.tolist(),
+            "network_metrics": {
+                "average_connectivity": float(avg_connectivity),
+                "average_node_degree": float(avg_degree),
+                "hub_neuron_indices": hub_neurons.tolist(),
+                "network_density": float(
+                    np.sum(connectivity_matrix > 0) /
+                    (len(neurons_props) * (len(neurons_props) - 1))
+                )
+            }
+        }
+
+    def assess_neural_health_markers(
+            self,neurons: List[Neuron]
+    ) -> Dict[str, float]:
+        if not neurons:
+            return {}
+
+        avg_health = np.mean([n.health for n in neurons])
+
+        avg_synapse_count = np.mean([n.synapse_count for n in neurons])
+        synapse_health = min(1.0, avg_synapse_count / 1000)
+
+        avg_mito_density = np.mean([n.mitochondria_density for n in neurons])
+        metabolic_health = avg_mito_density / 0.15
+
+        myelination_quality = np.mean([
+            n.myelination_index() for n in neurons
+        ])
+
+        structural_integrity = np.mean([
+            n.structural_integrity for n in neurons
+        ])
+
+        overall_health_index = (
+                                       avg_health * 0.3 +
+                                       synapse_health * 100 * 0.25 +
+                                       metabolic_health * 100 * 0.2 +
+                                       myelination_quality * 100 * 0.15 +
+                                       structural_integrity * 0.1
+                               ) / 100
+
+        return {
+            "average_neuron_health": avg_health,
+            "synaptic_health_index": synapse_health,
+            "metabolic_health_index": metabolic_health,
+            "myelination_quality": myelination_quality,
+            "structural_integrity": structural_integrity / 100,
+            "overall_neural_health": overall_health_index,
+            "degeneration_risk": 1 - overall_health_index
+        }
+
     def analyze_cells(self, image, dna: Optional[str] = None):
         """
         Analyze cells in the image and create Cell objects.
@@ -446,13 +950,25 @@ class ImageAnalyzer:
         # Measure properties
         nuclei_props = self.measure_object_properties(nuclei, img_array)
         cell_props = self.measure_object_properties(cell_bodies, img_array)
-        cytoplasm_props = self.measure_object_properties(cytoplasm, img_array)
+        cytoplasm_props = self.measure_object_properties(
+            cytoplasm, img_array
+        )
 
         # Create Cell objects
         cells = []
-        for i, (nucleus, cell, cyto) in enumerate(zip(nuclei_props, cell_props, cytoplasm_props)):
+        for i, (nucleus, cell, cyto) in enumerate(
+                zip(nuclei_props, cell_props, cytoplasm_props)
+        ):
             cell_type = self.determine_cell_type(nucleus, cell, cyto)
-            new_cell = self.create_cell_object(i, cell_type, cell, cyto, dna)
+
+            if cell_type == "neuron":
+                new_cell = self.create_neuron_object(
+                    i, cell, cyto, nucleus, image, dna
+                )
+            else:
+                new_cell = self.create_cell_object(
+                    i, cell_type, cell, cyto, dna
+                )
 
             # Detect if the cell is drugged
             if self.detect_drugged_cell(image, cell):
@@ -464,7 +980,10 @@ class ImageAnalyzer:
 
         return cells
 
-    def determine_cell_type(self, nucleus_props: Dict, cell_props: Dict, cytoplasm_props: Dict) -> str:
+    def determine_cell_type(
+            self, nucleus_props: Dict, cell_props: Dict,
+            cytoplasm_props: Dict
+    ) -> str:
         """
         Determine the cell type based on measured properties.
 
@@ -473,7 +992,6 @@ class ImageAnalyzer:
         :param cytoplasm_props: Properties of the cytoplasm
         :return: Determined cell type
         """
-        # This is a simplified determination and should be expanded based on specific criteria
         nucleus_size = nucleus_props['area']
         cell_size = cell_props['area']
         cytoplasm_size = cytoplasm_props['area']
@@ -482,18 +1000,34 @@ class ImageAnalyzer:
         nucleus_to_cell_ratio = nucleus_size / cell_size
         cytoplasm_to_cell_ratio = cytoplasm_size / cell_size
 
-        # Determine cell type based on the provided conditions
-        if nucleus_to_cell_ratio > 0.5:
+        eccentricity = cell_props.get('eccentricity', 0.5)
+        major_axis = cell_props.get('major_axis_length', 0)
+        minor_axis = cell_props.get('minor_axis_length', 0)
+
+        is_elongated = eccentricity > 0.8 and major_axis > 3 * minor_axis
+        has_processes = cell_size > nucleus_size * 5 and is_elongated
+
+        is_neuronal = (
+                has_processes and
+                nucleus_to_cell_ratio < 0.3 and
+                nucleus_intensity > 80
+        )
+
+        if is_neuronal:
+            return "neuron"
+        elif nucleus_to_cell_ratio > 0.5:
             return "stem cell"
         elif cytoplasm_to_cell_ratio > 0.7:
             return "epithelial cell"
-        elif nucleus_intensity > 100:  # Assuming 8-bit image, nucleus intensity range is 0-255
-            return "neuron"
+        elif nucleus_intensity > 100:
+            return "fibroblast"
         else:
-            return "fibroblast"  # Default type
+            return "somatic cell"
 
-    def create_cell_object(self, index: int, cell_type: str, cell_props: Dict,
-                           cytoplasm_props: Dict, dna: Optional[str] = None) -> Cell:
+    def create_cell_object(
+            self, index: int, cell_type: str, cell_props: Dict,
+            cytoplasm_props: Dict, dna: Optional[str] = None
+    ) -> Cell:
         """
         Create a Cell object based on measured properties.
 
@@ -508,104 +1042,131 @@ class ImageAnalyzer:
         # Estimate number of mitochondria based on cytoplasm size
         num_mitochondria = max(1, int(cytoplasm_props['area'] / 100))
 
-        # Common properties for both Cell 
+        # Common properties for both Cell
         common_props = {
             "name": f"Cell_{index}",
             "cell_type": cell_type,
             "dna": dna,
-            "health": int(100 * (cell_props['mean_intensity'] / 255))  # Assuming 8-bit image
+            "health": int(100 * (cell_props['mean_intensity'] / 255))
         }
 
         if cell_type == "stem cell":
             # Create a StemCell object
             cell = StemCell(**common_props)
             surface_proteins = [
-                "CD44",  # Common in mesenchymal and cancer stem cells
-                "CD133",  # Marker for various progenitor cells
-                "SSEA-4",  # Marker for pluripotent stem cells
-                "CD34",  # Marker of hematopoietic stem cells
-                "CD90",  # Found in mesenchymal and neural stem cells
-                "EpCAM",  # Expressed in embryonic stem cells
+                "CD44",
+                "CD133",
+                "SSEA-4",
+                "CD34",
+                "CD90",
+                "EpCAM",
             ]
 
             surface_receptors = [
-                "Notch Receptors",  # Involved in cell fate determination
-                "Wnt Receptors (Frizzled)",  # Crucial for maintaining stem cell pluripotency
-                "FGFR",  # Regulates stem cell proliferation and differentiation
-                "TGF-β Receptors",  # Controls growth and differentiation
-                "LIFR",  # Maintains pluripotency in embryonic stem cells
-                "EGFR",  # Involved in proliferation and differentiation
+                "Notch Receptors",
+                "Wnt Receptors (Frizzled)",
+                "FGFR",
+                "TGF-β Receptors",
+                "LIFR",
+                "EGFR",
             ]
-            cell.surface_proteins = np.random.choice(surface_proteins, size=np.random.randint(1, 3), replace=False).tolist()
-            cell.receptors = np.random.choice(surface_receptors, size=np.random.randint(1, 3), replace=False).tolist()
+            cell.surface_proteins = np.random.choice(
+                surface_proteins,
+                size=np.random.randint(1, 3),
+                replace=False
+            ).tolist()
+            cell.receptors = np.random.choice(
+                surface_receptors,
+                size=np.random.randint(1, 3),
+                replace=False
+            ).tolist()
         elif cell_type == "epithelial cell":
             # Create an EpithelialCell object
             cell = EpithelialCell(**common_props)
             surface_proteins = [
-                "E-Cadherin",  # Key adhesion protein for epithelial cell layers
-                "EpCAM",  # Involved in cell signaling and adhesion
-                "Claudins",  # Integral to tight junctions, regulating barrier function
-                "Occludin",  # Tight junction protein involved in sealing cell spaces
-                "Integrins",  # Mediate cell-matrix interactions and signaling
-                "Cytokeratins",  # Intermediate filaments specific to epithelial cells
+                "E-Cadherin",
+                "EpCAM",
+                "Claudins",
+                "Occludin",
+                "Integrins",
+                "Cytokeratins",
             ]
 
             receptors = [
-                "EGFR",  # Regulates epithelial cell growth and differentiation
-                "VEGFR",  # Involved in angiogenesis and epithelial response to environmental stimuli
-                "TGF-β Receptors",  # Regulate growth, differentiation, and EMT
-                "Integrin Receptors",  # Mediate adhesion and signaling
-                "Netrin Receptors",  # Influence cell migration and positioning
-                "Notch Receptors",  # Regulate cell fate and tissue homeostasis
+                "EGFR",
+                "VEGFR",
+                "TGF-β Receptors",
+                "Integrin Receptors",
+                "Netrin Receptors",
+                "Notch Receptors",
             ]
 
-            cell.surface_proteins = np.random.choice(surface_proteins, size=np.random.randint(1, 3), replace=False).tolist()
-            cell.receptors = np.random.choice(receptors, size=np.random.randint(1, 3), replace=False).tolist()
+            cell.surface_proteins = np.random.choice(
+                surface_proteins,
+                size=np.random.randint(1, 3),
+                replace=False
+            ).tolist()
+            cell.receptors = np.random.choice(
+                receptors,
+                size=np.random.randint(1, 3),
+                replace=False
+            ).tolist()
         elif cell_type == "somatic cell":
             # Create a SomaticCell object
             cell = SomaticCell(**common_props)
             surface_proteins = [
-                "Integrins",  # Mediate adhesion to ECM and signal transduction
-                "CD44",  # Involved in cell-cell interactions and migration
-                "CD45",  # Marker for hematopoietic cells, involved in signaling
-                "MHC I",  # Presents antigens to cytotoxic T cells
-                "Glypican",  # Influences cell growth and development
-                "Cadherins",  # Mediate cell-cell adhesion and maintain tissue structure
+                "Integrins",
+                "CD44",
+                "CD45",
+                "MHC I",
+                "Glypican",
+                "Cadherins",
             ]
 
             receptors = [
-                "GPCRs",  # Broad range of physiological processes
-                "EGFR",  # Regulates cell growth and differentiation
-                "FGFR",  # Regulates proliferation and development
-                "TGF-β Receptors",  # Regulates growth, differentiation, and immune responses
-                "Insulin Receptors",  # Mediates insulin effects on glucose metabolism
-                "VEGFR",  # Regulates angiogenesis and vascular permeability
+                "GPCRs",
+                "EGFR",
+                "FGFR",
+                "TGF-β Receptors",
+                "Insulin Receptors",
+                "VEGFR",
             ]
 
-            cell.surface_proteins = np.random.choice(surface_proteins, size=np.random.randint(1, 3), replace=False).tolist()
-            cell.receptors = np.random.choice(receptors, size=np.random.randint(1, 3), replace=False).tolist()
+            cell.surface_proteins = np.random.choice(
+                surface_proteins,
+                size=np.random.randint(1, 3),
+                replace=False
+            ).tolist()
+            cell.receptors = np.random.choice(
+                receptors,
+                size=np.random.randint(1, 3),
+                replace=False
+            ).tolist()
         else:
             # Create a regular Cell object
             cell = Cell(**common_props)
             # Add some most often used proteins
             receptors = [
-                "GPCR",  # G-Protein-Coupled Receptors - involved in many physiological processes
-                "EGFR",  # Epidermal Growth Factor Receptor - involved in cell growth and differentiation
-                "Integrin Receptors",  # Involved in cell adhesion and signal transduction
+                "GPCR",
+                "EGFR",
+                "Integrin Receptors",
                 "TGF-β Receptors",
-                # Transforming Growth Factor Beta Receptors - regulate cell growth and immune function
-                "MHC I",  # Major Histocompatibility Complex class I - involved in antigen presentation
+                "MHC I",
             ]
             surface_proteins = [
-                "CD44",  # Involved in cell-cell interactions, adhesion, and migration
-                "MHC I",  # Major Histocompatibility Complex class I - involved in antigen presentation
-                "CD29 (Integrin β1)",  # Part of integrin receptors, mediates cell adhesion and signaling
-                "ICAM-1",  # Intercellular Adhesion Molecule 1 - involved in cell-cell interactions and immune response
-                "CD45",  # Protein tyrosine phosphatase, receptor type C - a marker of hematopoietic cells
+                "CD44",
+                "MHC I",
+                "CD29 (Integrin β1)",
+                "ICAM-1",
+                "CD45",
             ]
 
-            cell.receptors = np.random.choice(receptors, size=2, replace=False).tolist()
-            cell.surface_proteins = np.random.choice(surface_proteins, size=2, replace=False).tolist()
+            cell.receptors = np.random.choice(
+                receptors, size=2, replace=False
+            ).tolist()
+            cell.surface_proteins = np.random.choice(
+                surface_proteins, size=2, replace=False
+            ).tolist()
 
         # Add cellular components
         cell.add_organelle(Organelle("nucleus", 1))
@@ -613,7 +1174,9 @@ class ImageAnalyzer:
 
         # Add mitochondria
         for _ in range(num_mitochondria):
-            cell.add_mitochondrion(efficiency=np.random.uniform(0.8, 1.0), health=100)
+            cell.add_mitochondrion(
+                efficiency=np.random.uniform(0.8, 1.0), health=100
+            )
 
         # Set other properties
         cell.metabolism_rate = cytoplasm_props['mean_intensity'] / 255
@@ -716,7 +1279,10 @@ class ImageAnalyzer:
         else:
             return "undefined"
 
-    def create_tissue_object(self, index: int, tissue_type: str, tissue_props, cells: List[Cell]) -> Tissue:
+    def create_tissue_object(
+            self, index: int, tissue_type: str, tissue_props: Dict,
+            cells: List[Cell]
+    ) -> Tissue:
         """
         Create a Tissue object based on measured properties.
 
@@ -727,20 +1293,30 @@ class ImageAnalyzer:
         :return: Tissue object
         """
         tissue_name = f"Tissue_{index}"
-        cancer_risk = 0.001  # Default cancer risk
+        cancer_risk = 0.001
 
         # Adjust tissue properties based on type
         if tissue_type == "epithelial":
-            cancer_risk = 0.002  # Higher cancer risk for epithelial tissue
+            cancer_risk = 0.002
         elif tissue_type == "connective":
-            cancer_risk = 0.0005  # Lower cancer risk for connective tissue
+            cancer_risk = 0.0005
+        elif tissue_type == "nervous":
+            cancer_risk = 0.0001
+            neurons = [c for c in cells if isinstance(c, Neuron)]
+            if neurons:
+                return self.create_neural_tissue_object(
+                    index, tissue_type, tissue_props, neurons
+                )
 
         tissue = Tissue(tissue_name, tissue_type, cells, cancer_risk)
 
         if 'mean_intensity' in tissue_props:
-            tissue.growth_rate = 0.05 * (tissue_props['mean_intensity'] / 255)
+            tissue.growth_rate = (
+                    0.05 * (tissue_props['mean_intensity'] / 255)
+            )
         else:
             tissue.growth_rate = 0
+
         if 'solidity' in tissue_props:
             tissue.healing_rate = 0.1 * tissue_props['solidity']
         else:
@@ -801,8 +1377,6 @@ class ImageAnalyzer:
 
         # Analyze tissue structure
         tissue_data = self.analyze_tissue(image)
-        tissue_type = self.determine_tissue_type(tissue_data)
-        print(tissue_type)
 
         tissues = []
         for index, tissue_props in enumerate(tissue_data):
@@ -817,7 +1391,8 @@ class ImageAnalyzer:
                 # Check if the cell is within the tissue segment
                 if self.cell_in_tissue(cell_mask, tissue_mask):
                     tissue_cells.append(cell)
-            tissue = self.create_tissue_object(index, tissue_type, tissue_data, tissue_cells)
+            tissue_type = self.determine_tissue_type(tissue_props)
+            tissue = self.create_tissue_object(index, tissue_type, tissue_props, tissue_cells)
             tissues.append(tissue)
 
         return tissues
@@ -1204,7 +1779,8 @@ class ImageAnalyzer:
         # Display cell types and drugged status as text on the plot
         for i, (txt, d) in enumerate(zip(cell_types, drugged)):
             drugged_label = " *" if d else ""
-            ax.text(i, healths[i] + 1, txt + drugged_label, ha='center', fontsize=8, rotation=0)
+            label = (txt or "Unknown") + drugged_label
+            ax.text(i, healths[i] + 1, label, ha='center', fontsize=8)
 
         # Show the plot
         plt.tight_layout()

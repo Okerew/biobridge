@@ -1,6 +1,6 @@
 # <img src="biobridge.png" alt="Biobridge Logo" width=25px height=25px> biobridge
 
-[![Watch the demo](biobridge.gif)](https://youtu.be/NJjOs8crb50?si=crlh7BSLSodye2MS)
+[![Watch the demo](biobridge.gif)](https://youtu.be/R56ankj64DI)
 
 Biobridge is a Python library for simulating biological processes and systems also analyzing them, visualising them, and interacting with them.
 
